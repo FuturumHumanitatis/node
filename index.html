@@ -3,840 +3,531 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Интерактивный Лента Мёбиуса: Путешествие в Одну Сторону</title>
-    
-    <!-- Подключение библиотек через CDN (UMD build для локального запуска без сборщиков) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
-
+    <title>Mobius Explorer 2.0: Cinematic Edition</title>
     <style>
-        :root {
-            --bg-color: #050510;
-            --primary-accent: #00f3ff;
-            --secondary-accent: #bc13fe;
-            --glass-bg: rgba(20, 20, 35, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --text-color: #ffffff;
-            --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        
+        /* Loading overlay */
+        #loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; justify-content: center; align-items: center;
+            color: #00ffff; font-size: 20px; z-index: 999; transition: opacity 0.5s;
         }
 
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg-color);
-            font-family: var(--font-main);
-            color: var(--text-color);
-            overflow: hidden;
-        }
-
-        /* Канвас на весь экран */
-        #canvas-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-
-        /* UI Оверлей */
-        #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
-            pointer-events: none; /* Пропускаем клики сквозь пустые места */
-            display: grid;
-            grid-template-areas: 
-                "header header"
-                "sidebar content"
-                "footer footer";
-            grid-template-columns: 350px 1fr;
-            grid-template-rows: auto 1fr auto;
-        }
-
-        /* Заголовок */
-        header {
-            grid-area: header;
-            padding: 20px 40px;
-            pointer-events: auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        h1 {
-            font-weight: 300;
-            font-size: 1.8rem;
-            margin: 0;
-            letter-spacing: 2px;
-            text-shadow: 0 0 10px var(--primary-accent);
-        }
-
-        h1 span {
-            color: var(--primary-accent);
-            font-weight: 700;
-        }
-
-        /* Боковая панель */
-        #sidebar {
-            grid-area: sidebar;
-            padding: 20px;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 20px;
-            pointer-events: auto;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-            transition: transform 0.3s ease, opacity 0.3s ease;
-        }
-
-        .card h2 {
-            margin-top: 0;
-            font-size: 1.1rem;
-            color: var(--secondary-accent);
-            border-bottom: 1px solid var(--glass-border);
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-
-        .math-block {
-            font-family: 'Courier New', monospace;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            color: #ccc;
-        }
-
-        .variable { color: var(--primary-accent); font-weight: bold; }
-        .value { color: #ffeb3b; }
-
-        /* Элементы управления симуляцией */
-        .controls-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            border: 1px solid transparent;
-        }
-
-        button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: var(--primary-accent);
-            box-shadow: 0 0 10px var(--primary-accent);
-        }
-
-        button.active {
-            background: var(--primary-accent);
-            color: #000;
-        }
-
-        /* Индикатор статуса */
-        #status-indicator {
-            margin-top: 10px;
-            font-size: 0.9rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* Кнопка гида */
-        #guide-btn {
-            background: transparent;
-            border: 1px solid var(--primary-accent);
-            color: var(--primary-accent);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        /* dat.GUI кастомизация */
-        .dg.ac {
-            z-index: 10 !important;
-            top: 80px !important;
-            right: 20px !important;
-        }
-        .dg.main {
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        /* Текст на фоне (снизу) */
-        footer {
-            grid-area: footer;
-            padding: 20px;
-            text-align: center;
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.4);
-        }
-
-        /* Адаптивность */
-        @media (max-width: 768px) {
-            #ui-layer {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto 1fr;
-            }
-            #sidebar {
-                width: 90%;
-                margin: 0 auto;
-            }
-            .dg.ac {
-                top: auto !important;
-                bottom: 10px !important;
-                right: 10px !important;
-            }
-        }
-
-        /* Всплывающее уведомление */
-        #toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--secondary-accent);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 30px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s;
-            z-index: 100;
-            font-weight: bold;
-        }
+        /* Custom GUI adjustments */
+        .dg.ac { z-index: 100 !important; }
+        .dg .c .slider { background: #1a1a1a !important; }
+        .dg .c .slider-fg { background: #00ffff !important; }
+        .dg.main.a { border-radius: 8px; overflow: hidden; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); }
     </style>
+    
+    <!-- Import Maps for cleaner module loading (Modern Standard) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
 
-    <!-- Уведомления -->
-    <div id="toast">Событие</div>
+<div id="loader">Инициализация квантового поля...</div>
 
-    <div id="canvas-container"></div>
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-    <div id="ui-layer">
-        <header>
-            <h1>MÖBIUS <span>EXPLORER</span></h1>
-            <button id="guide-btn" title="Запустить гид">?</button>
-        </header>
+    // --- CONFIGURATION ---
+    const PARAMS = {
+        radius: 6,
+        width: 2.5,
+        twists: 1.0, // 0 = cylinder, 1 = mobius
+        segments: 200, // Length detail
+        widthSegments: 30, // Width detail
+        antSpeed: 1.5,
+        bloomStrength: 0.8,
+        bloomRadius: 0.5,
+        bloomThreshold: 0.2,
+        showWireframe: false,
+        themeColor: '#00ccff'
+    };
 
-        <aside id="sidebar">
-            <!-- Панель объяснений -->
-            <div class="card">
-                <h2>Математика поверхности</h2>
-                <div class="math-block">
-                    x = [R + s ⋅ cos(t/2)] ⋅ cos(t)<br>
-                    y = [R + s ⋅ cos(t/2)] ⋅ sin(t)<br>
-                    z = s ⋅ sin(t/2)<br>
-                    <br>
-                    <span style="font-size: 0.8em; color: #888;">
-                        Где <span class="variable">t</span> - угол (0..2π), 
-                        <span class="variable">s</span> - ширина, 
-                        аргумент <span class="variable">t/2</span> создает эффект скручивания.
-                    </span>
-                </div>
-            </div>
+    // --- GLOBALS ---
+    let scene, camera, renderer, composer, controls;
+    let mobiusMesh, antMesh, trailLine;
+    let clock = new THREE.Clock();
+    let time = 0;
+    
+    // Ant state
+    const antState = {
+        u: 0, // position along strip (0 to 2PI * 2 for full loop on mobius)
+        v: 0, // position across width (-1 to 1)
+        legs: [], // array of leg objects to animate
+        trailPoints: [] // history of positions
+    };
 
-            <!-- Панель Муравья -->
-            <div class="card">
-                <h2>Симуляция Муравья</h2>
-                <p style="font-size: 0.9rem; margin-bottom: 15px;">
-                    Муравей движется по параметрическим координатам. На ленте Мёбиуса ему нужно сделать <span class="variable">2 оборота</span>, чтобы вернуться в начало.
-                </p>
-                
-                <div id="status-indicator">
-                    <span>Пройдено: <span id="dist-val" class="value">0%</span></span>
-                    <span>Сторона: <span id="side-val" class="value">A</span></span>
-                </div>
+    init();
+    animate();
 
-                <div class="controls-row">
-                    <button id="btn-play">Старт</button>
-                    <button id="btn-reset">Сброс</button>
-                </div>
-                <div class="controls-row">
-                    <button id="btn-trail">Скрыть след</button>
-                </div>
-            </div>
-        </aside>
+    function init() {
+        // 1. SCENE SETUP
+        const container = document.createElement('div');
+        document.body.appendChild(container);
 
-        <footer>
-            Кликните по ленте, чтобы переместить муравья. Двойной клик для смены цвета темы.
-        </footer>
-    </div>
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.02);
 
-    <script>
-        /**
-         * АРХИТЕКТУРА ПРИЛОЖЕНИЯ
-         * 1. SceneManager: Инициализация Three.js (Сцена, Камера, Рендерер)
-         * 2. MobiusStrip: Класс для генерации и обновления геометрии ленты
-         * 3. AntSimulator: Класс для управления муравьем (движение, физика, след)
-         * 4. UIManager: Связь интерфейса и логики
-         */
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(12, 10, 18);
 
-        // --- ГЛОБАЛЬНЫЕ НАСТРОЙКИ ---
-        const CONFIG = {
-            radius: 10,
-            width: 4,
-            twists: 1, // Количество полуоборотов (1 = Лента Мебиуса)
-            segments: 128, // Качество вдоль длины
-            widthSegments: 20, // Качество поперек
-            antSpeed: 0.005, // Скорость анимации
-            showWireframe: true
-        };
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
 
-        // --- 1. SCENE MANAGER ---
-        class SceneManager {
-            constructor(containerId) {
-                this.container = document.getElementById(containerId);
-                
-                // Scene
-                this.scene = new THREE.Scene();
-                this.scene.fog = new THREE.FogExp2(0x050510, 0.02);
+        // 2. CONTROLS
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 50;
 
-                // Camera
-                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 15, 25);
+        // 3. LIGHTING
+        const ambientLight = new THREE.AmbientLight(0x404040, 2); 
+        scene.add(ambientLight);
 
-                // Renderer
-                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(window.devicePixelRatio);
-                this.renderer.shadowMap.enabled = true;
-                this.container.appendChild(this.renderer.domElement);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
 
-                // Controls
-                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-                this.controls.enableDamping = true;
-                this.controls.dampingFactor = 0.05;
-                this.controls.maxDistance = 100;
+        // Accent Light (matches theme)
+        const pointLight = new THREE.PointLight(PARAMS.themeColor, 5, 50);
+        pointLight.position.set(-5, 5, -5);
+        scene.add(pointLight);
 
-                // Lighting
-                this.setupLights();
+        // 4. ENVIRONMENT
+        createStarfield();
+        createFloor();
 
-                // Resize handler
-                window.addEventListener('resize', () => this.onWindowResize(), false);
+        // 5. OBJECTS
+        createMobiusStrip();
+        createAnt();
+        createTrail();
 
-                // Raycaster for interactivity
-                this.raycaster = new THREE.Raycaster();
-                this.mouse = new THREE.Vector2();
-            }
+        // 6. POST-PROCESSING (Bloom)
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = PARAMS.bloomThreshold;
+        bloomPass.strength = PARAMS.bloomStrength;
+        bloomPass.radius = PARAMS.bloomRadius;
 
-            setupLights() {
-                const ambientLight = new THREE.AmbientLight(0x404040, 2);
-                this.scene.add(ambientLight);
+        composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
 
-                const pointLight1 = new THREE.PointLight(0x00f3ff, 1.5, 50);
-                pointLight1.position.set(10, 10, 10);
-                this.scene.add(pointLight1);
+        // 7. GUI
+        setupGUI();
+        
+        // Remove loader
+        document.getElementById('loader').style.opacity = 0;
+        setTimeout(() => document.getElementById('loader').remove(), 500);
 
-                const pointLight2 = new THREE.PointLight(0xbc13fe, 1.5, 50);
-                pointLight2.position.set(-10, -10, -5);
-                this.scene.add(pointLight2);
-            }
+        window.addEventListener('resize', onWindowResize);
+    }
 
-            onWindowResize() {
-                this.camera.aspect = window.innerWidth / window.innerHeight;
-                this.camera.updateProjectionMatrix();
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-            }
+    // --- PROCEDURAL GEOMETRY GENERATORS ---
 
-            render() {
-                this.controls.update();
-                TWEEN.update();
-                this.renderer.render(this.scene, this.camera);
+    function getMobiusPoint(u, v, target) {
+        // Parametric Mobius Formula
+        // u: 0 to 2PI (around the ring)
+        // v: -1 to 1 (width)
+        // twist factor: controls how many half-twists
+        
+        const R = PARAMS.radius;
+        const w = PARAMS.width / 2; // half-width
+        
+        // Handle twist accumulation
+        // Multiply u by twists/2 inside the cosine/sine for the twist mechanism
+        const alpha = (PARAMS.twists * u) / 2;
+
+        const x = (R + w * v * Math.cos(alpha)) * Math.cos(u);
+        const y = (R + w * v * Math.cos(alpha)) * Math.sin(u);
+        const z = w * v * Math.sin(alpha);
+
+        // Rotate to lay flat on XZ plane generally, but with twist
+        // Swapping Y and Z, or just rotate vector
+        target.set(x, z, y); 
+    }
+
+    function createMobiusStrip() {
+        if (mobiusMesh) {
+            mobiusMesh.geometry.dispose();
+            scene.remove(mobiusMesh);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        const indices = [];
+        const vertices = [];
+        const normals = [];
+        const colors = [];
+        const uvs = [];
+
+        const color1 = new THREE.Color(0x001133); // Dark Blue
+        const color2 = new THREE.Color(PARAMS.themeColor); // Cyan/Theme
+
+        const uSeg = PARAMS.segments;
+        const vSeg = PARAMS.widthSegments;
+
+        // Generate vertices
+        for (let i = 0; i <= uSeg; i++) {
+            const u = (i / uSeg) * Math.PI * 2;
+            
+            for (let j = 0; j <= vSeg; j++) {
+                const v = (j / vSeg) * 2 - 1; // -1 to 1
+
+                const p = new THREE.Vector3();
+                getMobiusPoint(u, v, p);
+                vertices.push(p.x, p.y, p.z);
+
+                // UVs
+                uvs.push(i / uSeg, j / vSeg);
+
+                // Vertex Colors (Gradient along U)
+                const mixedColor = color1.clone().lerp(color2, 0.5 + 0.5 * Math.sin(u * 2));
+                colors.push(mixedColor.r, mixedColor.g, mixedColor.b);
             }
         }
 
-        // --- 2. MOBIUS STRIP GENERATOR ---
-        class MobiusStrip {
-            constructor(scene) {
-                this.scene = scene;
-                this.mesh = null;
-                this.wireframe = null;
-                this.geometry = null;
-                
-                this.material = new THREE.MeshPhysicalMaterial({
-                    color: 0x222222,
-                    metalness: 0.1,
-                    roughness: 0.2,
-                    clearcoat: 1.0,
-                    clearcoatRoughness: 0.1,
-                    side: THREE.DoubleSide, // Важно: рендерим обе стороны
-                    flatShading: false
-                });
+        // Generate indices
+        for (let i = 0; i < uSeg; i++) {
+            for (let j = 0; j < vSeg; j++) {
+                const a = i * (vSeg + 1) + j;
+                const b = (i + 1) * (vSeg + 1) + j;
+                const c = (i + 1) * (vSeg + 1) + (j + 1);
+                const d = i * (vSeg + 1) + (j + 1);
 
-                this.wireframeMat = new THREE.MeshBasicMaterial({
-                    color: 0x00f3ff,
-                    wireframe: true,
-                    transparent: true,
-                    opacity: 0.15
-                });
-
-                this.init();
-            }
-
-            // Основная параметрическая формула
-            // u: [0, 2PI] (угол кольца), v: [-1, 1] (нормализованная ширина)
-            // Возвращает Vector3
-            calculatePoint(u, v, targetVec) {
-                const R = CONFIG.radius;
-                const w = CONFIG.width / 2;
-                const t = CONFIG.twists; // число полуоборотов
-
-                // x = (R + v*cos(t*u/2)) * cos(u)
-                // y = (R + v*cos(t*u/2)) * sin(u)
-                // z = v * sin(t*u/2)
-                
-                // Адаптация для Three.js осей (Y вверх)
-                const widthOffset = v * w;
-                const twistAngle = (t * u) / 2;
-
-                const x = (R + widthOffset * Math.cos(twistAngle)) * Math.cos(u);
-                const z = (R + widthOffset * Math.cos(twistAngle)) * Math.sin(u); // Z и Y поменяем местами для горизонтального расположения
-                const y = widthOffset * Math.sin(twistAngle);
-
-                targetVec.set(x, y, z);
-            }
-
-            generateGeometry() {
-                // Создаем кастомную геометрию
-                const geom = new THREE.BufferGeometry();
-                const indices = [];
-                const vertices = [];
-                const normals = [];
-                const uvs = [];
-
-                const uSeg = CONFIG.segments;
-                const vSeg = CONFIG.widthSegments;
-                
-                // Генерируем вершины
-                for (let i = 0; i <= uSeg; i++) {
-                    const u = (i / uSeg) * Math.PI * 2;
-                    
-                    for (let j = 0; j <= vSeg; j++) {
-                        const v = (j / vSeg) * 2 - 1; // от -1 до 1
-
-                        const p = new THREE.Vector3();
-                        this.calculatePoint(u, v, p);
-                        vertices.push(p.x, p.y, p.z);
-
-                        // Простые UV
-                        uvs.push(i / uSeg, j / vSeg);
-                    }
-                }
-
-                // Генерируем индексы (треугольники)
-                for (let i = 0; i < uSeg; i++) {
-                    for (let j = 0; j < vSeg; j++) {
-                        const a = i * (vSeg + 1) + j;
-                        const b = (i + 1) * (vSeg + 1) + j;
-                        const c = (i + 1) * (vSeg + 1) + (j + 1);
-                        const d = i * (vSeg + 1) + (j + 1);
-
-                        // Faces
-                        indices.push(a, b, d);
-                        indices.push(b, c, d);
-                    }
-                }
-
-                geom.setIndex(indices);
-                geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-                geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-                geom.computeVertexNormals();
-
-                return geom;
-            }
-
-            init() {
-                this.update();
-            }
-
-            update() {
-                if (this.mesh) {
-                    this.scene.remove(this.mesh);
-                    this.geometry.dispose();
-                }
-                if (this.wireframe) {
-                    this.scene.remove(this.wireframe);
-                }
-
-                this.geometry = this.generateGeometry();
-
-                this.mesh = new THREE.Mesh(this.geometry, this.material);
-                this.scene.add(this.mesh);
-
-                if (CONFIG.showWireframe) {
-                    this.wireframe = new THREE.Mesh(this.geometry, this.wireframeMat);
-                    // Немного сдвигаем wireframe чтобы не мерцал (z-fighting)
-                    this.wireframe.scale.setScalar(1.001); 
-                    this.scene.add(this.wireframe);
-                }
+                indices.push(a, b, d);
+                indices.push(b, c, d);
             }
         }
 
-        // --- 3. ANT SIMULATOR ---
-        class AntSimulator {
-            constructor(scene, mobiusInstance) {
-                this.scene = scene;
-                this.mobius = mobiusInstance;
-                
-                // Состояние муравья
-                this.u = 0; // Позиция вдоль ленты (0...4PI для полного цикла Мебиуса)
-                this.v = 0; // Позиция поперек (-1...1)
-                this.isPlaying = false;
-                this.trailVisible = true;
+        geometry.setIndex(indices);
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(vertices, 3)); // Placeholder, recomputed below
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        
+        geometry.computeVertexNormals();
 
-                // Меш муравья
-                this.mesh = this.createAntMesh();
-                this.scene.add(this.mesh);
+        // Material
+        const material = new THREE.MeshPhysicalMaterial({
+            vertexColors: true,
+            metalness: 0.3,
+            roughness: 0.2,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            side: THREE.DoubleSide,
+            wireframe: PARAMS.showWireframe
+        });
 
-                // След (Trail)
-                this.trailPoints = [];
-                this.trailGeometry = new THREE.BufferGeometry();
-                this.trailMaterial = new THREE.LineBasicMaterial({ color: 0xbc13fe, linewidth: 2 });
-                this.trailLine = new THREE.Line(this.trailGeometry, this.trailMaterial);
-                this.scene.add(this.trailLine);
+        mobiusMesh = new THREE.Mesh(geometry, material);
+        mobiusMesh.castShadow = true;
+        mobiusMesh.receiveShadow = true;
+        scene.add(mobiusMesh);
+    }
 
-                // Векторы для вычислений (чтобы не создавать их в цикле)
-                this.pos = new THREE.Vector3();
-                this.nextPos = new THREE.Vector3();
-                this.tangent = new THREE.Vector3();
-                this.normal = new THREE.Vector3();
-                this.binormal = new THREE.Vector3();
-                this.dummyObj = new THREE.Object3D(); // Для вычисления матрицы поворота
-            }
+    // --- ANT CREATION & ANIMATION ---
 
-            createAntMesh() {
-                const group = new THREE.Group();
-                
-                // Тело (неоновая пирамидка)
-                const bodyGeom = new THREE.ConeGeometry(0.5, 1.5, 8);
-                bodyGeom.rotateX(Math.PI / 2); // Положить на бок
-                const bodyMat = new THREE.MeshStandardMaterial({ 
-                    color: 0xffffff, 
-                    emissive: 0xbc13fe,
-                    emissiveIntensity: 0.5
-                });
-                const body = new THREE.Mesh(bodyGeom, bodyMat);
-                group.add(body);
+    function createAnt() {
+        const antGroup = new THREE.Group();
+        
+        const bodyMat = new THREE.MeshStandardMaterial({ 
+            color: 0x111111, 
+            roughness: 0.4, 
+            metalness: 0.8 
+        });
 
-                // Голова
-                const headGeom = new THREE.SphereGeometry(0.4);
-                const head = new THREE.Mesh(headGeom, bodyMat);
-                head.position.z = 1; // Вперед
-                group.add(head);
+        // 1. Body Parts
+        const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), bodyMat);
+        abdomen.scale.set(1, 1, 1.5);
+        abdomen.position.z = -0.4;
+        
+        const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), bodyMat);
+        thorax.position.z = 0.1;
 
-                return group;
-            }
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), bodyMat);
+        head.position.z = 0.5;
 
-            update() {
-                if (this.isPlaying) {
-                    this.u += CONFIG.antSpeed;
-                }
+        // Eyes
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.05), eyeMat);
+        leftEye.position.set(0.12, 0.1, 0.6);
+        const rightEye = leftEye.clone();
+        rightEye.position.set(-0.12, 0.1, 0.6);
+        antGroup.add(leftEye, rightEye);
 
-                // Ключевой момент: Лента Мебиуса (1 twist) имеет период 4PI для нормалей,
-                // но геометрически координаты повторяются каждые 2PI (с инверсией v).
-                // Мы будем использовать u, растущее бесконечно, и брать остаток.
-                
-                const currentU = this.u % (Math.PI * 4); // Цикл 4 Pi
-                
-                // Вычисляем позицию муравья
-                // Для формулы нам нужно u в пределах 0..2PI. 
-                // Если мы во "втором" круге (2PI..4PI), то геометрически это тот же u, но v инвертирован.
-                
-                let effectiveU = currentU;
-                let effectiveV = this.v;
+        antGroup.add(abdomen, thorax, head);
 
-                // Логика "умного" отображения на скрученную поверхность
-                // Если twist нечетный (Мёбиус), то после 2PI мы на "другой" стороне.
-                // Формула calculatePoint сама обрабатывает скручивание, если мы передаем linear U,
-                // но нам нужно корректно обновлять интерфейс и след.
-                
-                // Просто передаем текущее U в формулу. Если U > 2PI, косинус twist/2 сделает v отрицательным сам.
-                // Нам нужно нормализовать U для формулы, так как она ожидает радианы, но бесконечный рост ок.
-                
-                this.mobius.calculatePoint(this.u, this.v, this.pos);
-                
-                // Вычисляем ориентацию (LookAt + Up vector)
-                // Касательная (куда смотрит)
-                const delta = 0.01;
-                this.mobius.calculatePoint(this.u + delta, this.v, this.nextPos);
-                this.tangent.subVectors(this.nextPos, this.pos).normalize();
-
-                // Нормаль (где верх)
-                // Для параметрической поверхности нормаль - это векторное произведение касательных по U и по V
-                // Упрощенно: найдем точку чуть сбоку по V
-                const sideV = new THREE.Vector3();
-                this.mobius.calculatePoint(this.u, this.v + 0.1, sideV);
-                const bitangent = new THREE.Vector3().subVectors(sideV, this.pos).normalize();
-                
-                this.normal.crossVectors(this.tangent, bitangent).normalize();
-                
-                // Позиционируем муравья
-                this.mesh.position.copy(this.pos);
-                
-                // Ориентируем муравья
-                const up = this.normal;
-                // Матрица поворота для объекта на поверхности
-                const matrix = new THREE.Matrix4();
-                matrix.lookAt(this.nextPos, this.pos, up);
-                this.mesh.quaternion.setFromRotationMatrix(matrix);
-
-                // След
-                if (this.trailVisible && this.isPlaying) {
-                    this.trailPoints.push(this.pos.x, this.pos.y, this.pos.z);
-                    // Ограничим длину следа для производительности (например, 2000 точек)
-                    if (this.trailPoints.length > 6000) { 
-                        this.trailPoints.splice(0, 3);
-                    }
-                    this.trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(this.trailPoints, 3));
-                    this.trailGeometry.setDrawRange(0, this.trailPoints.length / 3);
-                }
-
-                this.updateUI();
-            }
-
-            reset() {
-                this.u = 0;
-                this.trailPoints = [];
-                this.trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-                this.update(); // принудительно обновить позицию
-            }
-
-            moveTo(targetU) {
-                // Анимация перемещения в конкретную точку
-                new TWEEN.Tween(this)
-                    .to({ u: targetU }, 1000)
-                    .easing(TWEEN.Easing.Quadratic.Out)
-                    .start();
-            }
-
-            togglePlay() {
-                this.isPlaying = !this.isPlaying;
-            }
-
-            toggleTrail() {
-                this.trailVisible = !this.trailVisible;
-                this.trailLine.visible = this.trailVisible;
-            }
-
-            updateUI() {
-                // Обновление текстов
-                const cycle = Math.PI * 2;
-                const totalDist = this.u;
-                const laps = Math.floor(totalDist / cycle);
-                
-                // Определяем "сторону" (условно, т.к. сторона одна)
-                // Если twist нечетный: 
-                // Lap 0 (0-2PI): Сторона А
-                // Lap 1 (2PI-4PI): Сторона B (визуально под лентой)
-                // Lap 2: Снова А
-                const isSideA = (laps % 2 === 0);
-                
-                const percent = Math.floor(((totalDist % (cycle*2)) / (cycle*2)) * 100);
-
-                document.getElementById('dist-val').innerText = `${percent}% (Круг ${laps + 1})`;
-                document.getElementById('side-val').innerText = isSideA ? "Внешняя?" : "Внутренняя?";
-                document.getElementById('side-val').style.color = isSideA ? '#00f3ff' : '#bc13fe';
-            }
+        // 2. Legs (Procedural)
+        // 3 pairs attached to thorax
+        antState.legs = [];
+        const legPositions = [0.15, 0.0, -0.15]; // Relative Z on thorax
+        
+        for(let i=0; i<3; i++) {
+            // Left and Right legs
+            createLeg(antGroup, thorax, legPositions[i], 1, i);  // Left
+            createLeg(antGroup, thorax, legPositions[i], -1, i); // Right
         }
 
-        // --- 4. MAIN APP ---
-        const app = {
-            init() {
-                this.sceneManager = new SceneManager('canvas-container');
-                this.mobius = new MobiusStrip(this.sceneManager.scene);
-                this.ant = new AntSimulator(this.sceneManager.scene, this.mobius);
-                
-                this.setupGUI();
-                this.setupEvents();
-                this.animate();
-                
-                this.showToast("Добро пожаловать в Mobius Explorer");
-            },
+        antMesh = antGroup;
+        scene.add(antMesh);
+    }
 
-            setupGUI() {
-                const gui = new dat.GUI({ autoPlace: false });
-                document.querySelector('#ui-layer').appendChild(gui.domElement);
-                gui.domElement.classList.add('dg', 'ac'); // стиль
+    function createLeg(parentGroup, parentBody, zOffset, side, index) {
+        // Simple 2-segment leg
+        const legGroup = new THREE.Group();
+        // Pivot point at thorax
+        legGroup.position.set(side * 0.2, 0, zOffset + 0.1); 
+        
+        // Upper leg
+        const upperLegGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4);
+        upperLegGeo.rotateZ(Math.PI / 2);
+        upperLegGeo.translate(0.2, 0, 0); // Shift so pivot is at start
+        const upperLeg = new THREE.Mesh(upperLegGeo, parentBody.material);
+        
+        // Lower leg
+        const lowerLegGeo = new THREE.CylinderGeometry(0.02, 0.01, 0.5);
+        lowerLegGeo.rotateZ(Math.PI / 2);
+        lowerLegGeo.translate(0.25, 0, 0);
+        const lowerLeg = new THREE.Mesh(lowerLegGeo, parentBody.material);
+        lowerLeg.position.x = 0.4; // Attach to end of upper leg
+        lowerLeg.rotation.z = -Math.PI / 2; // Initial bend (downwards)
 
-                const folderGeom = gui.addFolder('Геометрия Ленты');
-                folderGeom.add(CONFIG, 'twists', 0, 4, 1).name('Скручивания').onChange(() => this.regenerate());
-                folderGeom.add(CONFIG, 'width', 1, 8).name('Ширина').onChange(() => this.regenerate());
-                folderGeom.add(CONFIG, 'radius', 5, 15).name('Радиус').onChange(() => this.regenerate());
-                folderGeom.add(CONFIG, 'showWireframe').name('Сетка').onChange(() => this.regenerate());
-                folderGeom.open();
+        upperLeg.add(lowerLeg);
+        legGroup.add(upperLeg);
+        parentGroup.add(legGroup);
 
-                const folderSim = gui.addFolder('Симуляция');
-                folderSim.add(CONFIG, 'antSpeed', 0.001, 0.05).name('Скорость');
-                folderSim.open();
-            },
+        // Initial pose
+        legGroup.rotation.z = side * (Math.PI / 4); // Lift slightly
+        legGroup.rotation.y = side * ((index - 1) * 0.5); // Spread legs
 
-            regenerate() {
-                this.mobius.update();
-                // При изменении геометрии сбрасываем след, т.к. он больше не соответствует поверхности
-                this.ant.trailPoints = [];
-            },
+        // Save reference for animation
+        antState.legs.push({
+            group: legGroup,
+            upper: upperLeg,
+            lower: lowerLeg,
+            side: side, // 1 or -1
+            index: index, // 0, 1, 2
+            baseRotZ: legGroup.rotation.z,
+            baseRotY: legGroup.rotation.y
+        });
+    }
 
-            setupEvents() {
-                // Кнопки UI
-                const btnPlay = document.getElementById('btn-play');
-                btnPlay.addEventListener('click', () => {
-                    this.ant.togglePlay();
-                    btnPlay.innerText = this.ant.isPlaying ? "Пауза" : "Старт";
-                    btnPlay.classList.toggle('active');
-                });
+    function updateAnt(delta) {
+        if (!antMesh) return;
 
-                document.getElementById('btn-reset').addEventListener('click', () => {
-                    this.ant.reset();
-                    this.showToast("Позиция сброшена");
-                });
+        const speed = PARAMS.antSpeed;
+        antState.u += speed * delta;
+        
+        // --- 1. Position & Orientation on Strip ---
+        const u = antState.u;
+        const v = antState.v;
 
-                document.getElementById('btn-trail').addEventListener('click', (e) => {
-                    this.ant.toggleTrail();
-                    e.target.innerText = this.ant.trailVisible ? "Скрыть след" : "Показать след";
-                });
+        // Calculate Position (P)
+        const pos = new THREE.Vector3();
+        getMobiusPoint(u, v, pos);
+        antMesh.position.copy(pos);
 
-                document.getElementById('guide-btn').addEventListener('click', () => {
-                    this.runGuide();
-                });
+        // Calculate Tangent (Forward vector)
+        const nextPos = new THREE.Vector3();
+        getMobiusPoint(u + 0.01, v, nextPos);
+        const tangent = new THREE.Vector3().subVectors(nextPos, pos).normalize();
 
-                // Клик по канвасу (Raycasting)
-                this.sceneManager.renderer.domElement.addEventListener('pointerdown', (event) => {
-                    // Переводим координаты мыши в -1...1
-                    const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
-                    const mouse = new THREE.Vector2(
-                        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                        -((event.clientY - rect.top) / rect.height) * 2 + 1
-                    );
+        // Calculate Normal (Up vector)
+        // Approximate by taking a point slightly offset in width (v)
+        const sidePos = new THREE.Vector3();
+        getMobiusPoint(u, v + 0.1, sidePos);
+        const bitangent = new THREE.Vector3().subVectors(sidePos, pos).normalize();
+        const normal = new THREE.Vector3().crossVectors(tangent, bitangent).normalize();
+        
+        // If twist makes normal flip, we might need check. 
+        // But for visual continuity on Mobius, math.cross usually handles it.
+        
+        // Create Rotation Matrix
+        const dummy = new THREE.Object3D();
+        dummy.position.copy(pos);
+        dummy.up.copy(normal);
+        dummy.lookAt(nextPos);
+        antMesh.quaternion.copy(dummy.quaternion);
 
-                    this.sceneManager.raycaster.setFromCamera(mouse, this.sceneManager.camera);
-                    
-                    // Пересечение с мешем ленты
-                    const intersects = this.sceneManager.raycaster.intersectObject(this.mobius.mesh);
+        // --- 2. Leg Animation (Tripod Gait) ---
+        // Groups: (LeftFront, RightMid, LeftBack) vs (RightFront, LeftMid, RightBack)
+        const walkCycle = time * speed * 10;
+        
+        antState.legs.forEach(leg => {
+            const isGroupA = (leg.side === 1 && leg.index % 2 === 0) || (leg.side === -1 && leg.index % 2 !== 0);
+            const phase = isGroupA ? 0 : Math.PI;
+            
+            // Lift leg (Z rotation relative to body)
+            const lift = Math.max(0, Math.sin(walkCycle + phase));
+            leg.group.rotation.z = leg.baseRotZ + (leg.side * lift * 0.5);
 
-                    if (intersects.length > 0) {
-                        const uv = intersects[0].uv;
-                        // uv.x идет от 0 до 1 вдоль всей длины (0..2PI)
-                        // Нам нужно преобразовать это в глобальное U муравья
-                        // Сложность: uv.x цикличен. Нужно найти ближайший виток к текущему положению муравья.
-                        
-                        let targetBaseU = uv.x * Math.PI * 2;
-                        
-                        // Логика поиска ближайшего U (с учетом кругов)
-                        const currentCycle = Math.floor(this.ant.u / (Math.PI * 2));
-                        let targetU = targetBaseU + (currentCycle * Math.PI * 2);
-                        
-                        // Если кликнули "назад", но близко вперед, или наоборот
-                        if (targetU < this.ant.u && (this.ant.u - targetU) > Math.PI) {
-                            targetU += Math.PI * 2;
-                        } else if (targetU > this.ant.u && (targetU - this.ant.u) > Math.PI) {
-                             targetU -= Math.PI * 2;
-                        }
+            // Move leg forward/back (Y rotation relative to body)
+            const swing = Math.cos(walkCycle + phase);
+            leg.group.rotation.y = leg.baseRotY + (swing * 0.3);
+        });
 
-                        this.ant.moveTo(targetU);
-                        this.showToast("Муравей ползет к точке!");
-                    }
-                });
-            },
+        // Slight body wobble
+        antMesh.position.addScaledVector(normal, Math.abs(Math.sin(walkCycle*2)) * 0.05);
 
-            showToast(msg) {
-                const el = document.getElementById('toast');
-                el.innerText = msg;
-                el.style.opacity = 1;
-                el.style.bottom = "50px";
-                setTimeout(() => {
-                    el.style.opacity = 0;
-                    el.style.bottom = "30px";
-                }, 2000);
-            },
+        // --- 3. Trail Update ---
+        updateTrail(pos);
+    }
 
-            runGuide() {
-                // Простой сценарий обучения
-                this.showToast("Гид: 1. Смотрите на скручивание");
-                
-                // 1. Сброс камеры и параметров
-                new TWEEN.Tween(this.sceneManager.camera.position)
-                    .to({ x: 0, y: 20, z: 0 }, 1500)
-                    .easing(TWEEN.Easing.Cubic.InOut)
-                    .start();
+    // --- TRAIL SYSTEM ---
+    
+    function createTrail() {
+        // Start with empty geometry
+        const geometry = new THREE.BufferGeometry();
+        // Pre-allocate buffer for performance (e.g., 500 points)
+        const maxPoints = 500;
+        const positions = new Float32Array(maxPoints * 3);
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setDrawRange(0, 0);
 
-                CONFIG.twists = 0; // Цилиндр
-                this.regenerate();
+        const material = new THREE.LineBasicMaterial({ 
+            color: PARAMS.themeColor, 
+            linewidth: 2 // Note: linewidth only works on WebGL1 usually, will be 1px on WebGL2
+        });
 
-                setTimeout(() => {
-                    this.showToast("Гид: Это цилиндр (0 скручиваний)");
-                }, 1500);
+        trailLine = new THREE.Line(geometry, material);
+        scene.add(trailLine);
+    }
 
-                setTimeout(() => {
-                    // Анимация скручивания
-                    const obj = { t: 0 };
-                    new TWEEN.Tween(obj)
-                        .to({ t: 1 }, 2000)
-                        .onUpdate(() => {
-                            CONFIG.twists = obj.t;
-                            this.regenerate();
-                        })
-                        .start();
-                    this.showToast("Гид: Создаем ленту Мёбиуса...");
-                }, 3000);
+    function updateTrail(newPos) {
+        // Add new point
+        antState.trailPoints.push(newPos.clone());
+        
+        // Limit length
+        if (antState.trailPoints.length > 500) {
+            antState.trailPoints.shift();
+        }
 
-                setTimeout(() => {
-                    this.showToast("Гид: Теперь запустим муравья!");
-                    this.ant.reset();
-                    this.ant.isPlaying = true;
-                    document.getElementById('btn-play').innerText = "Пауза";
-                    document.getElementById('btn-play').classList.add('active');
-                    
-                    new TWEEN.Tween(this.sceneManager.camera.position)
-                        .to({ x: 0, y: 15, z: 25 }, 2000)
-                        .start();
-                }, 5500);
-            },
+        // We could use CatmullRomCurve3 here to smooth, but just updating buffer is faster for real-time
+        // To make it smooth visually, we just need high point density (which we have from 60fps)
+        
+        const positions = trailLine.geometry.attributes.position.array;
+        
+        for (let i = 0; i < antState.trailPoints.length; i++) {
+            positions[i * 3] = antState.trailPoints[i].x;
+            positions[i * 3 + 1] = antState.trailPoints[i].y;
+            positions[i * 3 + 2] = antState.trailPoints[i].z;
+        }
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                this.ant.update();
-                this.sceneManager.render();
-            }
-        };
+        trailLine.geometry.attributes.position.needsUpdate = true;
+        trailLine.geometry.setDrawRange(0, antState.trailPoints.length);
+        
+        // Update glow color to match theme
+        trailLine.material.color.set(PARAMS.themeColor);
+    }
 
-        // Запуск при загрузке
-        window.onload = () => app.init();
+    // --- ENVIRONMENT HELPERS ---
 
-    </script>
+    function createStarfield() {
+        const geom = new THREE.BufferGeometry();
+        const vertices = [];
+        for(let i=0; i<2000; i++) {
+            vertices.push(
+                (Math.random() - 0.5) * 200,
+                (Math.random() - 0.5) * 200,
+                (Math.random() - 0.5) * 200
+            );
+        }
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, opacity: 0.8 });
+        const stars = new THREE.Points(geom, mat);
+        scene.add(stars);
+    }
+
+    function createFloor() {
+        const geom = new THREE.PlaneGeometry(200, 200);
+        const mat = new THREE.ShadowMaterial({ opacity: 0.3 });
+        const floor = new THREE.Mesh(geom, mat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -8;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Add a grid for visual reference
+        const grid = new THREE.GridHelper(200, 50, 0x333333, 0x111111);
+        grid.position.y = -8.01;
+        scene.add(grid);
+    }
+
+    // --- UI SETUP ---
+
+    function setupGUI() {
+        const gui = new GUI({ title: 'Mobius Controls' });
+        
+        const folderGeo = gui.addFolder('Geometry');
+        folderGeo.add(PARAMS, 'twists', 0, 5, 0.1).name('Twists').onChange(createMobiusStrip);
+        folderGeo.add(PARAMS, 'width', 0.1, 5).name('Width').onChange(createMobiusStrip);
+        folderGeo.add(PARAMS, 'radius', 1, 10).name('Radius').onChange(createMobiusStrip);
+        folderGeo.add(PARAMS, 'showWireframe').name('Wireframe').onChange(createMobiusStrip);
+
+        const folderAnt = gui.addFolder('The Ant');
+        folderAnt.add(PARAMS, 'antSpeed', 0, 5).name('Speed');
+
+        const folderVis = gui.addFolder('Visuals');
+        folderVis.addColor(PARAMS, 'themeColor').name('Theme Color').onChange(() => {
+            createMobiusStrip();
+            scene.children.forEach(c => {
+                if(c.isPointLight) c.color.set(PARAMS.themeColor);
+            });
+        });
+        folderVis.add(PARAMS, 'bloomStrength', 0, 3).onChange(v => bloomPass.strength = v);
+        
+        // Reset Ant button
+        const obj = { reset: () => {
+            antState.u = 0;
+            antState.trailPoints = [];
+        }};
+        folderAnt.add(obj, 'reset').name('Reset Position');
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- MAIN LOOP ---
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        time += delta;
+
+        updateAnt(delta);
+        controls.update();
+
+        // Render with post-processing
+        composer.render();
+    }
+</script>
 </body>
 </html>
