@@ -1,355 +1,842 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Golden Ratio | MathVerse</title>
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- P5.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        deep: '#050505',
-                        glass: 'rgba(255, 255, 255, 0.03)',
-                        neon: '#00f3ff',
-                        accent: '#7000ff',
-                    },
-                    fontFamily: {
-                        sans: ['"Space Grotesk"', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'monospace'],
-                        serif: ['"Merriweather"', 'serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <title>Интерактивный Лента Мёбиуса: Путешествие в Одну Сторону</title>
+    
+    <!-- Подключение библиотек через CDN (UMD build для локального запуска без сборщиков) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 
     <style>
-        /* 1. ATMOSPHERE & BASICS */
-        body {
-            background-color: #050505;
-            color: #e0e0e0;
-            overflow-x: hidden;
-            cursor: none; /* Hide default cursor */
+        :root {
+            --bg-color: #050510;
+            --primary-accent: #00f3ff;
+            --secondary-accent: #bc13fe;
+            --glass-bg: rgba(20, 20, 35, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
-        /* 2. NOISE TEXTURE OVERLAY */
-        .noise-overlay {
-            position: fixed;
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            font-family: var(--font-main);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        /* Канвас на весь экран */
+        #canvas-container {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            z-index: 9998;
-            opacity: 0.06;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+            z-index: 1;
         }
 
-        /* 3. CUSTOM CURSOR */
-        #cursor {
-            position: fixed;
+        /* UI Оверлей */
+        #ui-layer {
+            position: absolute;
             top: 0;
             left: 0;
-            width: 20px;
-            height: 20px;
-            border: 1px solid white;
-            background-color: white; /* Needed for difference mode */
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none; /* Пропускаем клики сквозь пустые места */
+            display: grid;
+            grid-template-areas: 
+                "header header"
+                "sidebar content"
+                "footer footer";
+            grid-template-columns: 350px 1fr;
+            grid-template-rows: auto 1fr auto;
+        }
+
+        /* Заголовок */
+        header {
+            grid-area: header;
+            padding: 20px 40px;
+            pointer-events: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-weight: 300;
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--primary-accent);
+        }
+
+        h1 span {
+            color: var(--primary-accent);
+            font-weight: 700;
+        }
+
+        /* Боковая панель */
+        #sidebar {
+            grid-area: sidebar;
+            padding: 20px;
             pointer-events: none;
-            z-index: 9999;
-            mix-blend-mode: difference; /* Inverts colors */
-            transition: transform 0.15s ease-out, width 0.2s, height 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        /* Cursor hover state */
-        body:has(a:hover) #cursor,
-        body:has(input:hover) #cursor,
-        body:has(.math:hover) #cursor {
-            transform: translate(-50%, -50%) scale(1.5);
-            background-color: transparent;
-            border-color: #00f3ff;
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 20px;
+            pointer-events: auto;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
-        /* 4. TYPOGRAPHY & INTERACTION */
-        .math {
-            font-family: 'Merriweather', serif;
-            font-style: italic;
-            transition: color 0.3s ease, text-shadow 0.3s ease;
-            cursor: none; /* Ensure custom cursor stays */
-            display: inline-block;
-        }
-
-        /* Formula Hover Effect */
-        .math:hover {
-            color: #00f3ff;
-            text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            color: var(--secondary-accent);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .math-block {
-            background: rgba(255,255,255,0.02);
-            border-left: 2px solid #333;
-            padding: 1rem 2rem;
-            margin: 2rem 0;
-            font-family: 'Merriweather', serif;
-            transition: border-color 0.3s;
-        }
-        .math-block:hover {
-            border-left-color: #00f3ff;
+            font-family: 'Courier New', monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #ccc;
         }
 
-        /* 5. UI ELEMENTS */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #050505; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .variable { color: var(--primary-accent); font-weight: bold; }
+        .value { color: #ffeb3b; }
 
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
+        /* Элементы управления симуляцией */
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            border: 1px solid transparent;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 10px var(--primary-accent);
+        }
+
+        button.active {
+            background: var(--primary-accent);
+            color: #000;
+        }
+
+        /* Индикатор статуса */
+        #status-indicator {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Кнопка гида */
+        #guide-btn {
             background: transparent;
-            cursor: none; /* Custom cursor handles this */
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 16px;
-            width: 16px;
+            border: 1px solid var(--primary-accent);
+            color: var(--primary-accent);
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: #00f3ff;
-            margin-top: -6px;
-            box-shadow: 0 0 10px #00f3ff;
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 2px;
-            background: #333;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
         }
 
-        .sticky-col { position: sticky; top: 120px; height: fit-content; }
-        .glass-panel {
-            background: rgba(20, 20, 25, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* dat.GUI кастомизация */
+        .dg.ac {
+            z-index: 10 !important;
+            top: 80px !important;
+            right: 20px !important;
+        }
+        .dg.main {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Текст на фоне (снизу) */
+        footer {
+            grid-area: footer;
+            padding: 20px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            #ui-layer {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr;
+            }
+            #sidebar {
+                width: 90%;
+                margin: 0 auto;
+            }
+            .dg.ac {
+                top: auto !important;
+                bottom: 10px !important;
+                right: 10px !important;
+            }
+        }
+
+        /* Всплывающее уведомление */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--secondary-accent);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            z-index: 100;
+            font-weight: bold;
         }
     </style>
 </head>
-<body class="antialiased selection:bg-neon selection:text-black">
+<body>
 
-    <!-- NOISE OVERLAY -->
-    <div class="noise-overlay"></div>
+    <!-- Уведомления -->
+    <div id="toast">Событие</div>
 
-    <!-- CUSTOM CURSOR -->
-    <div id="cursor"></div>
+    <div id="canvas-container"></div>
 
-    <!-- NAVIGATION -->
-    <nav class="fixed top-0 w-full z-50 py-4 px-8 flex justify-between items-center border-b border-white/5 bg-deep/80 backdrop-blur-md">
-        <a href="#" class="flex items-center gap-2 text-gray-400 hover:text-neon transition-colors group">
-            <span class="font-mono text-xs group-hover:-translate-x-1 transition-transform">← BACK_TO_CATALOG</span>
-        </a>
-        <div class="font-sans font-bold tracking-tight">MATH<span class="text-neon">VERSE</span> / READER</div>
-        <div class="w-24"></div>
-    </nav>
+    <div id="ui-layer">
+        <header>
+            <h1>MÖBIUS <span>EXPLORER</span></h1>
+            <button id="guide-btn" title="Запустить гид">?</button>
+        </header>
 
-    <main class="max-w-[1600px] mx-auto pt-28 pb-20 px-6 relative z-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
-
-            <!-- TOC -->
-            <aside class="hidden lg:block lg:col-span-2 relative">
-                <div class="sticky-col pl-4 border-l border-white/10">
-                    <h4 class="font-mono text-xs text-neon mb-6 tracking-widest">CONTENTS</h4>
-                    <ul class="space-y-4 font-sans text-sm text-gray-500">
-                        <li><a href="#intro" class="hover:text-white transition-colors block border-l-2 border-transparent hover:border-white pl-2 -ml-2.5">01. Introduction</a></li>
-                        <li><a href="#math" class="hover:text-white transition-colors block border-l-2 border-transparent hover:border-white pl-2 -ml-2.5">02. The Definition</a></li>
-                        <li><a href="#nature" class="hover:text-white transition-colors block border-l-2 border-transparent hover:border-white pl-2 -ml-2.5">03. Phyllotaxis</a></li>
-                        <li><a href="#sim" class="hover:text-white transition-colors block border-l-2 border-transparent hover:border-white pl-2 -ml-2.5">04. Simulation</a></li>
-                    </ul>
-                    <div class="mt-12 opacity-50">
-                        <h4 class="font-mono text-xs text-gray-600 mb-2">PAPER_ID</h4>
-                        <p class="font-mono text-xs text-gray-400">MV-8921-PHI</p>
-                    </div>
+        <aside id="sidebar">
+            <!-- Панель объяснений -->
+            <div class="card">
+                <h2>Математика поверхности</h2>
+                <div class="math-block">
+                    x = [R + s ⋅ cos(t/2)] ⋅ cos(t)<br>
+                    y = [R + s ⋅ cos(t/2)] ⋅ sin(t)<br>
+                    z = s ⋅ sin(t/2)<br>
+                    <br>
+                    <span style="font-size: 0.8em; color: #888;">
+                        Где <span class="variable">t</span> - угол (0..2π), 
+                        <span class="variable">s</span> - ширина, 
+                        аргумент <span class="variable">t/2</span> создает эффект скручивания.
+                    </span>
                 </div>
-            </aside>
+            </div>
 
-            <!-- ARTICLE -->
-            <article class="lg:col-span-6 font-serif leading-relaxed text-gray-300">
-                <header class="mb-12 border-b border-white/10 pb-8">
-                    <div class="flex gap-3 mb-4 font-mono text-xs text-neon">
-                        <span class="border border-neon/30 px-2 py-0.5 rounded">ALGORITHM</span>
-                        <span class="border border-neon/30 px-2 py-0.5 rounded">NATURE</span>
-                    </div>
-                    <h1 class="font-sans text-4xl md:text-5xl font-bold text-white mb-6">The Divine Proportion: <br>Algorithmic Beauty of <span class="math text-accent">φ</span></h1>
-                    <p class="text-lg text-gray-400 italic">
-                        "Mathematics is the alphabet with which God has written the universe." — Galileo Galilei
-                    </p>
-                </header>
-
-                <section id="intro" class="mb-12">
-                    <p class="mb-4 text-lg">
-                        The Golden Ratio, often denoted by the Greek letter phi (<span class="math text-xl">φ</span>), is an irrational number approximately equal to 1.61803398. It appears frequently in geometry, art, architecture, and other areas.
-                    </p>
-                    <p class="mb-4">
-                        But its most fascinating application lies in nature's efficiency algorithms. How do plants arrange their leaves to maximize sunlight? How do flowers pack seeds?
-                    </p>
-                </section>
-
-                <section id="math" class="mb-12">
-                    <h2 class="font-sans text-2xl font-bold text-white mb-4">02. Mathematical Definition</h2>
-                    <p class="mb-4">
-                        Two quantities are in the golden ratio if their ratio is the same as the ratio of their sum to the larger of the two quantities. Expressed algebraically:
-                    </p>
-
-                    <div class="math-block text-xl text-center text-white">
-                        <span class="math">φ</span> = <span class="text-3xl mx-2">½</span> (1 + <span class="text-2xl">√</span>5) ≈ <span class="math text-neon">1.61803...</span>
-                    </div>
-
-                    <p class="mb-4">
-                        This number is intimately connected to the Fibonacci sequence (<span class="math">0, 1, 1, 2, 3, 5...</span>), where the ratio of consecutive numbers converges to <span class="math">φ</span>.
-                    </p>
-                </section>
-
-                <section id="nature" class="mb-12">
-                    <h2 class="font-sans text-2xl font-bold text-white mb-4">03. Phyllotaxis</h2>
-                    <p class="mb-4">
-                        In botany, phyllotaxis is the arrangement of leaves on a plant stem. The most common angle between successive leaves is the <strong>Golden Angle</strong>:
-                    </p>
-                    <div class="font-mono text-neon text-center py-4 text-xl border-y border-white/5 my-4 hover:tracking-widest transition-all cursor-crosshair">137.50776°</div>
-                    <p>
-                        This specific angle ensures that no leaf completely shades another. It is nature's way of optimizing for light absorption.
-                    </p>
-                </section>
-
-                <section id="sim" class="mb-20">
-                    <h2 class="font-sans text-2xl font-bold text-white mb-4">04. Simulation Notes</h2>
-                    <p>
-                        Interact with the panel on the right. Notice how even a <span class="math text-red-400">0.1°</span> deviation from the Golden Angle destroys the packing efficiency, creating gaps or spiral arms.
-                    </p>
-                </section>
-            </article>
-
-            <!-- SIMULATION LAB -->
-            <aside class="lg:col-span-4 relative">
-                <div class="sticky-col">
-                    <div class="glass-panel rounded-xl overflow-hidden p-1 shadow-2xl shadow-neon/5 ring-1 ring-white/10">
-                        <div class="bg-black/40 px-4 py-3 border-b border-white/10 flex justify-between items-center">
-                            <span class="font-mono text-xs text-neon animate-pulse">/// LIVE_RENDER</span>
-                            <div class="flex gap-1">
-                                <div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
-                                <div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
-                            </div>
-                        </div>
-
-                        <div id="canvas-container" class="w-full h-[350px] bg-black relative cursor-none"></div>
-
-                        <div class="p-6">
-                            <div class="flex justify-between items-end mb-2">
-                                <label class="font-sans text-sm font-bold text-white">Divergence Angle</label>
-                                <span id="angle-display" class="font-mono text-neon text-lg">137.5°</span>
-                            </div>
-                            <input type="range" id="angle-slider" min="135" max="140" step="0.01" value="137.5" class="mb-6">
-
-                            <div class="flex justify-between items-end mb-2">
-                                <label class="font-sans text-sm font-bold text-gray-400">Scale</label>
-                            </div>
-                            <input type="range" id="c-slider" min="2" max="8" step="0.1" value="4">
-                        </div>
-                    </div>
+            <!-- Панель Муравья -->
+            <div class="card">
+                <h2>Симуляция Муравья</h2>
+                <p style="font-size: 0.9rem; margin-bottom: 15px;">
+                    Муравей движется по параметрическим координатам. На ленте Мёбиуса ему нужно сделать <span class="variable">2 оборота</span>, чтобы вернуться в начало.
+                </p>
+                
+                <div id="status-indicator">
+                    <span>Пройдено: <span id="dist-val" class="value">0%</span></span>
+                    <span>Сторона: <span id="side-val" class="value">A</span></span>
                 </div>
-            </aside>
-        </div>
-    </main>
 
-    <!-- LOGIC SCRIPTS -->
+                <div class="controls-row">
+                    <button id="btn-play">Старт</button>
+                    <button id="btn-reset">Сброс</button>
+                </div>
+                <div class="controls-row">
+                    <button id="btn-trail">Скрыть след</button>
+                </div>
+            </div>
+        </aside>
+
+        <footer>
+            Кликните по ленте, чтобы переместить муравья. Двойной клик для смены цвета темы.
+        </footer>
+    </div>
+
     <script>
-        // --- 1. CUSTOM CURSOR LOGIC ---
-        const cursor = document.getElementById('cursor');
+        /**
+         * АРХИТЕКТУРА ПРИЛОЖЕНИЯ
+         * 1. SceneManager: Инициализация Three.js (Сцена, Камера, Рендерер)
+         * 2. MobiusStrip: Класс для генерации и обновления геометрии ленты
+         * 3. AntSimulator: Класс для управления муравьем (движение, физика, след)
+         * 4. UIManager: Связь интерфейса и логики
+         */
 
-        document.addEventListener('mousemove', (e) => {
-            // Using requestAnimationFrame for smoother performance
-            requestAnimationFrame(() => {
-                cursor.style.left = e.clientX + 'px';
-                cursor.style.top = e.clientY + 'px';
-            });
-        });
+        // --- ГЛОБАЛЬНЫЕ НАСТРОЙКИ ---
+        const CONFIG = {
+            radius: 10,
+            width: 4,
+            twists: 1, // Количество полуоборотов (1 = Лента Мебиуса)
+            segments: 128, // Качество вдоль длины
+            widthSegments: 20, // Качество поперек
+            antSpeed: 0.005, // Скорость анимации
+            showWireframe: true
+        };
 
-        document.addEventListener('mousedown', () => {
-            cursor.style.transform = "translate(-50%, -50%) scale(0.8)";
-        });
+        // --- 1. SCENE MANAGER ---
+        class SceneManager {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x050510, 0.02);
 
-        document.addEventListener('mouseup', () => {
-            cursor.style.transform = "translate(-50%, -50%) scale(1)";
-        });
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 15, 25);
 
-        // --- 2. P5.JS SIMULATION ---
-        const sketch = (p) => {
-            let angleSlider, cSlider, angleDisplay;
-            let container;
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.shadowMap.enabled = true;
+                this.container.appendChild(this.renderer.domElement);
 
-            p.setup = () => {
-                container = document.getElementById('canvas-container');
-                let canvas = p.createCanvas(container.offsetWidth, container.offsetHeight);
-                canvas.parent('canvas-container');
-                p.angleMode(p.DEGREES);
-                p.colorMode(p.HSB);
+                // Controls
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.maxDistance = 100;
 
-                angleSlider = document.getElementById('angle-slider');
-                cSlider = document.getElementById('c-slider');
-                angleDisplay = document.getElementById('angle-display');
-            };
+                // Lighting
+                this.setupLights();
 
-            p.draw = () => {
-                p.background(5, 0.8); // Slight opacity for trails? No, keep it clean for science
+                // Resize handler
+                window.addEventListener('resize', () => this.onWindowResize(), false);
 
-                angleDisplay.innerText = angleSlider.value + "°";
-                let angle = parseFloat(angleSlider.value);
-                let c = parseFloat(cSlider.value);
+                // Raycaster for interactivity
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+            }
 
-                p.translate(p.width / 2, p.height / 2);
+            setupLights() {
+                const ambientLight = new THREE.AmbientLight(0x404040, 2);
+                this.scene.add(ambientLight);
 
-                // Draw dots
-                for (let i = 0; i < 500; i++) {
-                    let a = i * angle;
-                    let r = c * p.sqrt(i);
-                    let x = r * p.cos(a);
-                    let y = r * p.sin(a);
+                const pointLight1 = new THREE.PointLight(0x00f3ff, 1.5, 50);
+                pointLight1.position.set(10, 10, 10);
+                this.scene.add(pointLight1);
 
-                    let dist = p.dist(0,0,x,y);
-                    // Color Logic: HSB Hue based on distance + slight rotation
-                    let hu = (dist * 0.5 + p.frameCount * 0.2) % 360;
+                const pointLight2 = new THREE.PointLight(0xbc13fe, 1.5, 50);
+                pointLight2.position.set(-10, -10, -5);
+                this.scene.add(pointLight2);
+            }
 
-                    // Logic to highlight "Golden Ratio" perfection
-                    let isPerfect = Math.abs(angle - 137.5) < 0.1;
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
 
-                    if (isPerfect) {
-                        p.fill(160, 200, 255); // Cyan/Blue uniform
-                        p.noStroke();
-                        p.ellipse(x, y, c, c);
-                    } else {
-                        // Chaos colors
-                        p.fill(hu, 200, 255);
-                        p.noStroke();
-                        p.ellipse(x, y, c * 0.8, c * 0.8);
+            render() {
+                this.controls.update();
+                TWEEN.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // --- 2. MOBIUS STRIP GENERATOR ---
+        class MobiusStrip {
+            constructor(scene) {
+                this.scene = scene;
+                this.mesh = null;
+                this.wireframe = null;
+                this.geometry = null;
+                
+                this.material = new THREE.MeshPhysicalMaterial({
+                    color: 0x222222,
+                    metalness: 0.1,
+                    roughness: 0.2,
+                    clearcoat: 1.0,
+                    clearcoatRoughness: 0.1,
+                    side: THREE.DoubleSide, // Важно: рендерим обе стороны
+                    flatShading: false
+                });
+
+                this.wireframeMat = new THREE.MeshBasicMaterial({
+                    color: 0x00f3ff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.15
+                });
+
+                this.init();
+            }
+
+            // Основная параметрическая формула
+            // u: [0, 2PI] (угол кольца), v: [-1, 1] (нормализованная ширина)
+            // Возвращает Vector3
+            calculatePoint(u, v, targetVec) {
+                const R = CONFIG.radius;
+                const w = CONFIG.width / 2;
+                const t = CONFIG.twists; // число полуоборотов
+
+                // x = (R + v*cos(t*u/2)) * cos(u)
+                // y = (R + v*cos(t*u/2)) * sin(u)
+                // z = v * sin(t*u/2)
+                
+                // Адаптация для Three.js осей (Y вверх)
+                const widthOffset = v * w;
+                const twistAngle = (t * u) / 2;
+
+                const x = (R + widthOffset * Math.cos(twistAngle)) * Math.cos(u);
+                const z = (R + widthOffset * Math.cos(twistAngle)) * Math.sin(u); // Z и Y поменяем местами для горизонтального расположения
+                const y = widthOffset * Math.sin(twistAngle);
+
+                targetVec.set(x, y, z);
+            }
+
+            generateGeometry() {
+                // Создаем кастомную геометрию
+                const geom = new THREE.BufferGeometry();
+                const indices = [];
+                const vertices = [];
+                const normals = [];
+                const uvs = [];
+
+                const uSeg = CONFIG.segments;
+                const vSeg = CONFIG.widthSegments;
+                
+                // Генерируем вершины
+                for (let i = 0; i <= uSeg; i++) {
+                    const u = (i / uSeg) * Math.PI * 2;
+                    
+                    for (let j = 0; j <= vSeg; j++) {
+                        const v = (j / vSeg) * 2 - 1; // от -1 до 1
+
+                        const p = new THREE.Vector3();
+                        this.calculatePoint(u, v, p);
+                        vertices.push(p.x, p.y, p.z);
+
+                        // Простые UV
+                        uvs.push(i / uSeg, j / vSeg);
                     }
                 }
-            };
 
-            p.windowResized = () => {
-                p.resizeCanvas(container.offsetWidth, container.offsetHeight);
+                // Генерируем индексы (треугольники)
+                for (let i = 0; i < uSeg; i++) {
+                    for (let j = 0; j < vSeg; j++) {
+                        const a = i * (vSeg + 1) + j;
+                        const b = (i + 1) * (vSeg + 1) + j;
+                        const c = (i + 1) * (vSeg + 1) + (j + 1);
+                        const d = i * (vSeg + 1) + (j + 1);
+
+                        // Faces
+                        indices.push(a, b, d);
+                        indices.push(b, c, d);
+                    }
+                }
+
+                geom.setIndex(indices);
+                geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                geom.computeVertexNormals();
+
+                return geom;
+            }
+
+            init() {
+                this.update();
+            }
+
+            update() {
+                if (this.mesh) {
+                    this.scene.remove(this.mesh);
+                    this.geometry.dispose();
+                }
+                if (this.wireframe) {
+                    this.scene.remove(this.wireframe);
+                }
+
+                this.geometry = this.generateGeometry();
+
+                this.mesh = new THREE.Mesh(this.geometry, this.material);
+                this.scene.add(this.mesh);
+
+                if (CONFIG.showWireframe) {
+                    this.wireframe = new THREE.Mesh(this.geometry, this.wireframeMat);
+                    // Немного сдвигаем wireframe чтобы не мерцал (z-fighting)
+                    this.wireframe.scale.setScalar(1.001); 
+                    this.scene.add(this.wireframe);
+                }
+            }
+        }
+
+        // --- 3. ANT SIMULATOR ---
+        class AntSimulator {
+            constructor(scene, mobiusInstance) {
+                this.scene = scene;
+                this.mobius = mobiusInstance;
+                
+                // Состояние муравья
+                this.u = 0; // Позиция вдоль ленты (0...4PI для полного цикла Мебиуса)
+                this.v = 0; // Позиция поперек (-1...1)
+                this.isPlaying = false;
+                this.trailVisible = true;
+
+                // Меш муравья
+                this.mesh = this.createAntMesh();
+                this.scene.add(this.mesh);
+
+                // След (Trail)
+                this.trailPoints = [];
+                this.trailGeometry = new THREE.BufferGeometry();
+                this.trailMaterial = new THREE.LineBasicMaterial({ color: 0xbc13fe, linewidth: 2 });
+                this.trailLine = new THREE.Line(this.trailGeometry, this.trailMaterial);
+                this.scene.add(this.trailLine);
+
+                // Векторы для вычислений (чтобы не создавать их в цикле)
+                this.pos = new THREE.Vector3();
+                this.nextPos = new THREE.Vector3();
+                this.tangent = new THREE.Vector3();
+                this.normal = new THREE.Vector3();
+                this.binormal = new THREE.Vector3();
+                this.dummyObj = new THREE.Object3D(); // Для вычисления матрицы поворота
+            }
+
+            createAntMesh() {
+                const group = new THREE.Group();
+                
+                // Тело (неоновая пирамидка)
+                const bodyGeom = new THREE.ConeGeometry(0.5, 1.5, 8);
+                bodyGeom.rotateX(Math.PI / 2); // Положить на бок
+                const bodyMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xffffff, 
+                    emissive: 0xbc13fe,
+                    emissiveIntensity: 0.5
+                });
+                const body = new THREE.Mesh(bodyGeom, bodyMat);
+                group.add(body);
+
+                // Голова
+                const headGeom = new THREE.SphereGeometry(0.4);
+                const head = new THREE.Mesh(headGeom, bodyMat);
+                head.position.z = 1; // Вперед
+                group.add(head);
+
+                return group;
+            }
+
+            update() {
+                if (this.isPlaying) {
+                    this.u += CONFIG.antSpeed;
+                }
+
+                // Ключевой момент: Лента Мебиуса (1 twist) имеет период 4PI для нормалей,
+                // но геометрически координаты повторяются каждые 2PI (с инверсией v).
+                // Мы будем использовать u, растущее бесконечно, и брать остаток.
+                
+                const currentU = this.u % (Math.PI * 4); // Цикл 4 Pi
+                
+                // Вычисляем позицию муравья
+                // Для формулы нам нужно u в пределах 0..2PI. 
+                // Если мы во "втором" круге (2PI..4PI), то геометрически это тот же u, но v инвертирован.
+                
+                let effectiveU = currentU;
+                let effectiveV = this.v;
+
+                // Логика "умного" отображения на скрученную поверхность
+                // Если twist нечетный (Мёбиус), то после 2PI мы на "другой" стороне.
+                // Формула calculatePoint сама обрабатывает скручивание, если мы передаем linear U,
+                // но нам нужно корректно обновлять интерфейс и след.
+                
+                // Просто передаем текущее U в формулу. Если U > 2PI, косинус twist/2 сделает v отрицательным сам.
+                // Нам нужно нормализовать U для формулы, так как она ожидает радианы, но бесконечный рост ок.
+                
+                this.mobius.calculatePoint(this.u, this.v, this.pos);
+                
+                // Вычисляем ориентацию (LookAt + Up vector)
+                // Касательная (куда смотрит)
+                const delta = 0.01;
+                this.mobius.calculatePoint(this.u + delta, this.v, this.nextPos);
+                this.tangent.subVectors(this.nextPos, this.pos).normalize();
+
+                // Нормаль (где верх)
+                // Для параметрической поверхности нормаль - это векторное произведение касательных по U и по V
+                // Упрощенно: найдем точку чуть сбоку по V
+                const sideV = new THREE.Vector3();
+                this.mobius.calculatePoint(this.u, this.v + 0.1, sideV);
+                const bitangent = new THREE.Vector3().subVectors(sideV, this.pos).normalize();
+                
+                this.normal.crossVectors(this.tangent, bitangent).normalize();
+                
+                // Позиционируем муравья
+                this.mesh.position.copy(this.pos);
+                
+                // Ориентируем муравья
+                const up = this.normal;
+                // Матрица поворота для объекта на поверхности
+                const matrix = new THREE.Matrix4();
+                matrix.lookAt(this.nextPos, this.pos, up);
+                this.mesh.quaternion.setFromRotationMatrix(matrix);
+
+                // След
+                if (this.trailVisible && this.isPlaying) {
+                    this.trailPoints.push(this.pos.x, this.pos.y, this.pos.z);
+                    // Ограничим длину следа для производительности (например, 2000 точек)
+                    if (this.trailPoints.length > 6000) { 
+                        this.trailPoints.splice(0, 3);
+                    }
+                    this.trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(this.trailPoints, 3));
+                    this.trailGeometry.setDrawRange(0, this.trailPoints.length / 3);
+                }
+
+                this.updateUI();
+            }
+
+            reset() {
+                this.u = 0;
+                this.trailPoints = [];
+                this.trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+                this.update(); // принудительно обновить позицию
+            }
+
+            moveTo(targetU) {
+                // Анимация перемещения в конкретную точку
+                new TWEEN.Tween(this)
+                    .to({ u: targetU }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            togglePlay() {
+                this.isPlaying = !this.isPlaying;
+            }
+
+            toggleTrail() {
+                this.trailVisible = !this.trailVisible;
+                this.trailLine.visible = this.trailVisible;
+            }
+
+            updateUI() {
+                // Обновление текстов
+                const cycle = Math.PI * 2;
+                const totalDist = this.u;
+                const laps = Math.floor(totalDist / cycle);
+                
+                // Определяем "сторону" (условно, т.к. сторона одна)
+                // Если twist нечетный: 
+                // Lap 0 (0-2PI): Сторона А
+                // Lap 1 (2PI-4PI): Сторона B (визуально под лентой)
+                // Lap 2: Снова А
+                const isSideA = (laps % 2 === 0);
+                
+                const percent = Math.floor(((totalDist % (cycle*2)) / (cycle*2)) * 100);
+
+                document.getElementById('dist-val').innerText = `${percent}% (Круг ${laps + 1})`;
+                document.getElementById('side-val').innerText = isSideA ? "Внешняя?" : "Внутренняя?";
+                document.getElementById('side-val').style.color = isSideA ? '#00f3ff' : '#bc13fe';
+            }
+        }
+
+        // --- 4. MAIN APP ---
+        const app = {
+            init() {
+                this.sceneManager = new SceneManager('canvas-container');
+                this.mobius = new MobiusStrip(this.sceneManager.scene);
+                this.ant = new AntSimulator(this.sceneManager.scene, this.mobius);
+                
+                this.setupGUI();
+                this.setupEvents();
+                this.animate();
+                
+                this.showToast("Добро пожаловать в Mobius Explorer");
+            },
+
+            setupGUI() {
+                const gui = new dat.GUI({ autoPlace: false });
+                document.querySelector('#ui-layer').appendChild(gui.domElement);
+                gui.domElement.classList.add('dg', 'ac'); // стиль
+
+                const folderGeom = gui.addFolder('Геометрия Ленты');
+                folderGeom.add(CONFIG, 'twists', 0, 4, 1).name('Скручивания').onChange(() => this.regenerate());
+                folderGeom.add(CONFIG, 'width', 1, 8).name('Ширина').onChange(() => this.regenerate());
+                folderGeom.add(CONFIG, 'radius', 5, 15).name('Радиус').onChange(() => this.regenerate());
+                folderGeom.add(CONFIG, 'showWireframe').name('Сетка').onChange(() => this.regenerate());
+                folderGeom.open();
+
+                const folderSim = gui.addFolder('Симуляция');
+                folderSim.add(CONFIG, 'antSpeed', 0.001, 0.05).name('Скорость');
+                folderSim.open();
+            },
+
+            regenerate() {
+                this.mobius.update();
+                // При изменении геометрии сбрасываем след, т.к. он больше не соответствует поверхности
+                this.ant.trailPoints = [];
+            },
+
+            setupEvents() {
+                // Кнопки UI
+                const btnPlay = document.getElementById('btn-play');
+                btnPlay.addEventListener('click', () => {
+                    this.ant.togglePlay();
+                    btnPlay.innerText = this.ant.isPlaying ? "Пауза" : "Старт";
+                    btnPlay.classList.toggle('active');
+                });
+
+                document.getElementById('btn-reset').addEventListener('click', () => {
+                    this.ant.reset();
+                    this.showToast("Позиция сброшена");
+                });
+
+                document.getElementById('btn-trail').addEventListener('click', (e) => {
+                    this.ant.toggleTrail();
+                    e.target.innerText = this.ant.trailVisible ? "Скрыть след" : "Показать след";
+                });
+
+                document.getElementById('guide-btn').addEventListener('click', () => {
+                    this.runGuide();
+                });
+
+                // Клик по канвасу (Raycasting)
+                this.sceneManager.renderer.domElement.addEventListener('pointerdown', (event) => {
+                    // Переводим координаты мыши в -1...1
+                    const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+                    const mouse = new THREE.Vector2(
+                        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                        -((event.clientY - rect.top) / rect.height) * 2 + 1
+                    );
+
+                    this.sceneManager.raycaster.setFromCamera(mouse, this.sceneManager.camera);
+                    
+                    // Пересечение с мешем ленты
+                    const intersects = this.sceneManager.raycaster.intersectObject(this.mobius.mesh);
+
+                    if (intersects.length > 0) {
+                        const uv = intersects[0].uv;
+                        // uv.x идет от 0 до 1 вдоль всей длины (0..2PI)
+                        // Нам нужно преобразовать это в глобальное U муравья
+                        // Сложность: uv.x цикличен. Нужно найти ближайший виток к текущему положению муравья.
+                        
+                        let targetBaseU = uv.x * Math.PI * 2;
+                        
+                        // Логика поиска ближайшего U (с учетом кругов)
+                        const currentCycle = Math.floor(this.ant.u / (Math.PI * 2));
+                        let targetU = targetBaseU + (currentCycle * Math.PI * 2);
+                        
+                        // Если кликнули "назад", но близко вперед, или наоборот
+                        if (targetU < this.ant.u && (this.ant.u - targetU) > Math.PI) {
+                            targetU += Math.PI * 2;
+                        } else if (targetU > this.ant.u && (targetU - this.ant.u) > Math.PI) {
+                             targetU -= Math.PI * 2;
+                        }
+
+                        this.ant.moveTo(targetU);
+                        this.showToast("Муравей ползет к точке!");
+                    }
+                });
+            },
+
+            showToast(msg) {
+                const el = document.getElementById('toast');
+                el.innerText = msg;
+                el.style.opacity = 1;
+                el.style.bottom = "50px";
+                setTimeout(() => {
+                    el.style.opacity = 0;
+                    el.style.bottom = "30px";
+                }, 2000);
+            },
+
+            runGuide() {
+                // Простой сценарий обучения
+                this.showToast("Гид: 1. Смотрите на скручивание");
+                
+                // 1. Сброс камеры и параметров
+                new TWEEN.Tween(this.sceneManager.camera.position)
+                    .to({ x: 0, y: 20, z: 0 }, 1500)
+                    .easing(TWEEN.Easing.Cubic.InOut)
+                    .start();
+
+                CONFIG.twists = 0; // Цилиндр
+                this.regenerate();
+
+                setTimeout(() => {
+                    this.showToast("Гид: Это цилиндр (0 скручиваний)");
+                }, 1500);
+
+                setTimeout(() => {
+                    // Анимация скручивания
+                    const obj = { t: 0 };
+                    new TWEEN.Tween(obj)
+                        .to({ t: 1 }, 2000)
+                        .onUpdate(() => {
+                            CONFIG.twists = obj.t;
+                            this.regenerate();
+                        })
+                        .start();
+                    this.showToast("Гид: Создаем ленту Мёбиуса...");
+                }, 3000);
+
+                setTimeout(() => {
+                    this.showToast("Гид: Теперь запустим муравья!");
+                    this.ant.reset();
+                    this.ant.isPlaying = true;
+                    document.getElementById('btn-play').innerText = "Пауза";
+                    document.getElementById('btn-play').classList.add('active');
+                    
+                    new TWEEN.Tween(this.sceneManager.camera.position)
+                        .to({ x: 0, y: 15, z: 25 }, 2000)
+                        .start();
+                }, 5500);
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.ant.update();
+                this.sceneManager.render();
             }
         };
 
-        new p5(sketch);
+        // Запуск при загрузке
+        window.onload = () => app.init();
+
     </script>
 </body>
 </html>
