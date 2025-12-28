@@ -3,40 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobius Explorer: Scientific Edition</title>
+    <title>Realistic Mobius Ant</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); /* Светлый чистый фон */
-            font-family: 'Segoe UI', sans-serif; 
-        }
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
-        
-        #ui-container {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 100;
-        }
-
-        /* Стиль для loader */
         #loader {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f5f7fa; display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            color: #333; font-size: 18px; z-index: 999; transition: opacity 0.5s;
+            background: #000; display: flex; justify-content: center; align-items: center;
+            color: #8B4513; font-size: 20px; z-index: 999; transition: opacity 0.5s;
         }
-        .spinner {
-            width: 40px; height: 40px; 
-            border: 4px solid #ccc; border-top-color: #333; 
-            border-radius: 50%; animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .dg.ac { z-index: 100 !important; }
     </style>
-    
-    <!-- Импорт Three.js -->
+    <!-- Import Map for Three.js -->
     <script type="importmap">
         {
             "imports": {
@@ -48,460 +26,518 @@
 </head>
 <body>
 
-<div id="loader">
-    <div class="spinner"></div>
-    <div>Генерация геометрии...</div>
-</div>
+<div id="loader">Генерация органической формы жизни...</div>
 
 <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 
-    // --- КОНФИГУРАЦИЯ ---
+    // --- CONFIGURATION ---
     const PARAMS = {
         radius: 7,
         width: 3,
-        twists: 1,      // 1 = Лента Мебиуса
-        segments: 150,  // Детализация длины
-        widthSegments: 40, // Детализация ширины
+        twists: 1, 
+        segments: 200, 
+        widthSegments: 40, // High detail for raycasting accuracy
         antSpeed: 1.0,
-        showWireframe: false,
-        bgColor: '#f5f7fa',
-        stripColor: '#e1e5ea'
+        bloomStrength: 0.5,
+        showWireframe: false
     };
 
-    // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-    let scene, camera, renderer, controls;
+    // --- GLOBALS ---
+    let scene, camera, renderer, composer, controls;
     let mobiusMesh;
-    let antRoot; // Корневой объект муравья
-    const clock = new THREE.Clock();
+    let ant; // Ant Instance
+    let clock = new THREE.Clock();
     
-    // Raycaster для привязки к поверхности
-    const raycaster = new THREE.Raycaster();
-    const downVector = new THREE.Vector3(0, -1, 0); // В локальных координатах муравья это "вниз"
-
-    // Состояние муравья
-    const antState = {
-        u: 0, // Позиция вдоль ленты (параметрическая)
-        v: 0, // Позиция поперек (-1..1)
-        legs: [], // Массив ног для анимации
-        antennae: [] // Массив усов
-    };
-
     init();
     animate();
 
     function init() {
-        // 1. СЦЕНА И КАМЕРА
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        // 1. Scene & Camera
         scene = new THREE.Scene();
-        // Мягкий туман для глубины (светлый)
-        scene.fog = new THREE.Fog(0xf5f7fa, 20, 60);
+        scene.fog = new THREE.FogExp2(0x050505, 0.015);
 
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(15, 12, 15);
+        camera.position.set(10, 12, 16);
 
-        // 2. РЕНДЕРЕР (Без пост-эффектов, чистый WebGL)
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        // 2. Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Мягкие тени
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-        document.body.appendChild(renderer.domElement);
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
 
-        // 3. КОНТРОЛЛЕР
+        // 3. Controls
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.maxDistance = 50;
+        controls.maxDistance = 60;
 
-        // 4. ОСВЕЩЕНИЕ (Студийное, яркое)
-        setupLighting();
+        // 4. Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 3);
+        scene.add(ambientLight);
 
-        // 5. ОБЪЕКТЫ
+        const spotLight = new THREE.SpotLight(0xffffff, 50);
+        spotLight.position.set(15, 20, 10);
+        spotLight.angle = 0.5;
+        spotLight.penumbra = 0.5;
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 2048;
+        spotLight.shadow.mapSize.height = 2048;
+        scene.add(spotLight);
+
+        const blueRimLight = new THREE.PointLight(0x0088ff, 3, 20);
+        blueRimLight.position.set(-10, -5, -10);
+        scene.add(blueRimLight);
+
+        // 5. Objects
+        createEnvironment();
         createMobiusStrip();
-        createRealisticAnt();
+        
+        // Init Ant
+        ant = new Ant(scene);
 
-        // 6. UI
+        // 6. Post-Processing
+        const renderPass = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0.2;
+        bloomPass.strength = PARAMS.bloomStrength;
+        bloomPass.radius = 0.5;
+        
+        composer = new EffectComposer(renderer);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+
+        // 7. GUI
         setupGUI();
-
-        // Обработка ресайза
-        window.addEventListener('resize', onWindowResize);
-
-        // Скрыть лоадер
+        
         document.getElementById('loader').style.opacity = 0;
         setTimeout(() => document.getElementById('loader').remove(), 500);
+        window.addEventListener('resize', onWindowResize);
     }
 
-    function setupLighting() {
-        // Яркий заполняющий свет
-        const ambient = new THREE.AmbientLight(0xffffff, 1.2);
-        scene.add(ambient);
+    // --- MATH & GEOMETRY ---
 
-        // Основной рисующий свет (солнце)
-        const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
-        mainLight.position.set(10, 20, 10);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 2048;
-        mainLight.shadow.mapSize.height = 2048;
-        mainLight.shadow.bias = -0.0001;
-        scene.add(mainLight);
-
-        // Контровой свет (для объема)
-        const rimLight = new THREE.DirectionalLight(0xddeeff, 1.0);
-        rimLight.position.set(-10, 5, -10);
-        scene.add(rimLight);
-    }
-
-    // --- ЛЕНТА МЁБИУСА ---
-
-    function getMobiusPoint(u, v, target) {
+    function getMobiusData(u, v, targetPos, targetNorm) {
         const R = PARAMS.radius;
         const w = PARAMS.width / 2;
-        
-        // Формула с учетом скручивания
         const alpha = (PARAMS.twists * u) / 2;
-        
-        const x = (R + w * v * Math.cos(alpha)) * Math.cos(u);
-        const y = w * v * Math.sin(alpha); // Y вверх
-        const z = (R + w * v * Math.cos(alpha)) * Math.sin(u);
 
-        target.set(x, y, z);
+        const x = (R + w * v * Math.cos(alpha)) * Math.cos(u);
+        const y = (R + w * v * Math.cos(alpha)) * Math.sin(u);
+        const z = w * v * Math.sin(alpha);
+
+        // Position (swap Y/Z for horizontal orientation)
+        targetPos.set(x, z, y);
+
+        if (targetNorm) {
+            // Analytical normal (approximate)
+            const du = 0.01; 
+            const dv = 0.1;
+            
+            const pU = new THREE.Vector3();
+            const pV = new THREE.Vector3();
+            
+            // Calc neighbor U
+            let alphaU = (PARAMS.twists * (u + du)) / 2;
+            let xU = (R + w * v * Math.cos(alphaU)) * Math.cos(u + du);
+            let yU = (R + w * v * Math.cos(alphaU)) * Math.sin(u + du);
+            let zU = w * v * Math.sin(alphaU);
+            pU.set(xU, zU, yU);
+
+            // Calc neighbor V
+            let alphaV = (PARAMS.twists * u) / 2;
+            let xV = (R + w * (v + dv) * Math.cos(alphaV)) * Math.cos(u);
+            let yV = (R + w * (v + dv) * Math.cos(alphaV)) * Math.sin(u);
+            let zV = w * (v + dv) * Math.sin(alphaV);
+            pV.set(xV, zV, yV);
+
+            const tangent = new THREE.Vector3().subVectors(pU, targetPos).normalize();
+            const bitangent = new THREE.Vector3().subVectors(pV, targetPos).normalize();
+            targetNorm.crossVectors(tangent, bitangent).normalize();
+        }
     }
 
     function createMobiusStrip() {
         if (mobiusMesh) {
-            mobiusMesh.geometry.dispose();
             scene.remove(mobiusMesh);
+            mobiusMesh.geometry.dispose();
         }
 
         const geometry = new THREE.BufferGeometry();
-        const indices = [];
         const vertices = [];
-        const normals = [];
-        const uvs = [];
+        const colors = [];
+        const indices = [];
 
         const uSeg = PARAMS.segments;
         const vSeg = PARAMS.widthSegments;
+        const c1 = new THREE.Color(0x000510);
+        const c2 = new THREE.Color(0x003344);
 
-        // Генерация вершин
         for (let i = 0; i <= uSeg; i++) {
             const u = (i / uSeg) * Math.PI * 2;
             for (let j = 0; j <= vSeg; j++) {
-                const v = (j / vSeg) * 2 - 1; // -1..1
+                const v = (j / vSeg) * 2 - 1;
                 const p = new THREE.Vector3();
-                getMobiusPoint(u, v, p);
+                getMobiusData(u, v, p, null);
                 vertices.push(p.x, p.y, p.z);
-                uvs.push(i / uSeg, j / vSeg);
+
+                // Grid pattern coloring
+                const isGrid = (i % 10 === 0 || j === 0 || j === vSeg);
+                const col = isGrid ? new THREE.Color(0x00aaff) : c1.clone().lerp(c2, Math.abs(v));
+                colors.push(col.r, col.g, col.b);
             }
         }
 
-        // Индексы
         for (let i = 0; i < uSeg; i++) {
             for (let j = 0; j < vSeg; j++) {
                 const a = i * (vSeg + 1) + j;
                 const b = (i + 1) * (vSeg + 1) + j;
                 const c = (i + 1) * (vSeg + 1) + (j + 1);
                 const d = i * (vSeg + 1) + (j + 1);
-                indices.push(a, b, d);
-                indices.push(b, c, d);
+                indices.push(a, b, d, b, c, d);
             }
         }
 
         geometry.setIndex(indices);
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         geometry.computeVertexNormals();
 
-        // Материал: Чистый, матовый, хорошо принимает тени
         const material = new THREE.MeshStandardMaterial({
-            color: PARAMS.stripColor,
+            vertexColors: true,
             roughness: 0.4,
-            metalness: 0.1,
-            side: THREE.DoubleSide, // Обязательно DoubleSide для ленты
+            metalness: 0.6,
+            side: THREE.DoubleSide,
             wireframe: PARAMS.showWireframe
         });
 
         mobiusMesh = new THREE.Mesh(geometry, material);
         mobiusMesh.receiveShadow = true;
-        mobiusMesh.castShadow = true;
         scene.add(mobiusMesh);
     }
 
-    // --- МОДЕЛЬ МУРАВЬЯ ---
+    // --- ANT CLASS (The Core Logic) ---
 
-    function createRealisticAnt() {
-        if (antRoot) scene.remove(antRoot);
-        antRoot = new THREE.Group();
-
-        // Материалы
-        const bodyColor = 0x8B4513; // Коричневый
-        const legColor = 0x5c2e0e; // Темно-коричневый
-        
-        const bodyMat = new THREE.MeshStandardMaterial({ 
-            color: bodyColor, roughness: 0.3, metalness: 0.1 
-        });
-        const eyeMat = new THREE.MeshPhysicalMaterial({ 
-            color: 0x000000, roughness: 0.0, clearcoat: 1.0 
-        }); // Блестящие глаза
-
-        // 1. ТЕЛО (3 сегмента)
-        
-        // Брюшко (Abdomen)
-        const abdomenGeo = new THREE.SphereGeometry(0.35, 32, 32);
-        abdomenGeo.scale(1, 0.9, 1.3);
-        const abdomen = new THREE.Mesh(abdomenGeo, bodyMat);
-        abdomen.position.z = -0.55;
-        abdomen.castShadow = true;
-
-        // Грудь (Thorax)
-        const thoraxGeo = new THREE.SphereGeometry(0.25, 32, 32);
-        thoraxGeo.scale(0.9, 0.9, 1.1);
-        const thorax = new THREE.Mesh(thoraxGeo, bodyMat);
-        thorax.position.z = 0; // Центр муравья
-        thorax.castShadow = true;
-
-        // Голова (Head)
-        const headGeo = new THREE.SphereGeometry(0.22, 32, 32);
-        headGeo.scale(1, 0.85, 1);
-        const head = new THREE.Mesh(headGeo, bodyMat);
-        head.position.z = 0.45;
-        head.castShadow = true;
-
-        // 2. ГЛАЗА
-        const eyeGeo = new THREE.SphereGeometry(0.06, 16, 16);
-        const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-        eyeL.position.set(0.12, 0.05, 0.12); // Относительно головы
-        const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-        eyeR.position.set(-0.12, 0.05, 0.12);
-        head.add(eyeL, eyeR);
-
-        // 3. АНТЕННЫ (Усы)
-        antState.antennae = [];
-        const antennaCurve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(0, 0, 0),
-            new THREE.Vector3(0.05, 0.1, 0.2),
-            new THREE.Vector3(0.1, 0.15, 0.4)
-        ]);
-        const antennaGeo = new THREE.TubeGeometry(antennaCurve, 8, 0.015, 6, false);
-        const antennaMat = new THREE.MeshStandardMaterial({ color: legColor });
-        
-        const antL = new THREE.Mesh(antennaGeo, antennaMat);
-        antL.position.set(0.08, 0.1, 0.18);
-        
-        const antR = new THREE.Mesh(antennaGeo, antennaMat);
-        antR.position.set(-0.08, 0.1, 0.18);
-        antR.scale.set(-1, 1, 1); // Отразить
-
-        head.add(antL, antR);
-        antState.antennae.push(antL, antR);
-
-        // Сборка тела
-        const bodyGroup = new THREE.Group();
-        bodyGroup.add(abdomen, thorax, head);
-        antRoot.add(bodyGroup);
-        antRoot.userData.body = bodyGroup; // Ссылка для анимации покачивания
-
-        // 4. НОГИ (Сложная структура)
-        antState.legs = [];
-        // Позиции ног на груди (z) и начальный разлет (y-rot)
-        const legConfigs = [
-            { z: 0.15, rot: Math.PI / 4, side: 1 },  // Передние L
-            { z: 0.15, rot: -Math.PI / 4, side: -1 },// Передние R
-            { z: 0.0, rot: Math.PI / 2, side: 1 },   // Средние L
-            { z: 0.0, rot: -Math.PI / 2, side: -1 }, // Средние R
-            { z: -0.15, rot: 3 * Math.PI / 4, side: 1 }, // Задние L
-            { z: -0.15, rot: -3 * Math.PI / 4, side: -1 } // Задние R
-        ];
-
-        legConfigs.forEach((conf, i) => {
-            const leg = createLeg(conf.side, legColor);
-            leg.root.position.set(conf.side * 0.15, -0.05, conf.z);
-            leg.root.rotation.y = conf.rot;
-            thorax.add(leg.root);
+    class Ant {
+        constructor(scene) {
+            this.scene = scene;
+            this.group = new THREE.Group();
             
-            antState.legs.push({
-                parts: leg,
-                config: conf,
-                index: i,
-                phase: (i % 2 === 0) ? 0 : Math.PI // Разные фазы для "трипод" походки
-            });
-        });
-
-        // Масштабируем всего муравья
-        antRoot.scale.setScalar(0.8);
-        scene.add(antRoot);
-    }
-
-    // Создание одной ноги из 3 сегментов: Coxa -> Femur -> Tibia
-    function createLeg(side, color) {
-        const mat = new THREE.MeshStandardMaterial({ color: color });
-        
-        // 1. Coxa (Тазик) - соединение с телом
-        const coxaGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.2);
-        coxaGeo.rotateZ(Math.PI / 2);
-        coxaGeo.translate(0.1, 0, 0); // Pivot в начале
-        const coxa = new THREE.Mesh(coxaGeo, mat);
-
-        // 2. Femur (Бедро) - идет вверх
-        const femurGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.4);
-        femurGeo.rotateZ(Math.PI / 2);
-        femurGeo.translate(0.2, 0, 0);
-        const femur = new THREE.Mesh(femurGeo, mat);
-        femur.position.x = 0.2; // Конец coxa
-        femur.rotation.z = side * Math.PI / 3; // Подъем вверх
-        coxa.add(femur);
-
-        // 3. Tibia (Голень) - идет вниз к земле
-        const tibiaGeo = new THREE.CylinderGeometry(0.02, 0.01, 0.5);
-        tibiaGeo.rotateZ(Math.PI / 2);
-        tibiaGeo.translate(0.25, 0, 0);
-        const tibia = new THREE.Mesh(tibiaGeo, mat);
-        tibia.position.x = 0.4; // Конец femur
-        tibia.rotation.z = side * -Math.PI / 1.5; // Резко вниз
-        femur.add(tibia);
-
-        return { root: coxa, coxa, femur, tibia };
-    }
-
-    // --- ЛОГИКА АНИМАЦИИ И ФИЗИКИ ---
-
-    function updateAnt(delta) {
-        if (!antRoot) return;
-        
-        const speed = PARAMS.antSpeed;
-        antState.u += speed * delta;
-
-        // 1. ПАРАМЕТРИЧЕСКИЙ РАСЧЕТ (Грубая позиция)
-        // Находим точку, где муравей "должен" быть математически
-        const targetPos = new THREE.Vector3();
-        const targetNext = new THREE.Vector3();
-        const targetSide = new THREE.Vector3();
-
-        getMobiusPoint(antState.u, antState.v, targetPos);
-        getMobiusPoint(antState.u + 0.05, antState.v, targetNext);
-        getMobiusPoint(antState.u, antState.v + 0.1, targetSide);
-
-        // Вычисляем базисные вектора (фрейм)
-        const forward = new THREE.Vector3().subVectors(targetNext, targetPos).normalize();
-        const tempSide = new THREE.Vector3().subVectors(targetSide, targetPos).normalize();
-        let normal = new THREE.Vector3().crossVectors(forward, tempSide).normalize();
-
-        // 2. RAYCASTING (Привязка к поверхности)
-        // Чтобы муравей не проваливался, пускаем луч к ленте
-        // Смещаемся чуть "вверх" по нормали от идеальной точки и стреляем "вниз"
-        
-        const rayOrigin = targetPos.clone().add(normal.clone().multiplyScalar(1.0));
-        const rayDir = normal.clone().negate(); // Вниз против нормали
-
-        raycaster.set(rayOrigin, rayDir);
-        const intersects = raycaster.intersectObject(mobiusMesh);
-
-        if (intersects.length > 0) {
-            const hit = intersects[0];
+            // Animation State
+            this.u = 0;
+            this.v = 0;
+            this.speed = 0;
+            this.raycaster = new THREE.Raycaster();
+            this.rayDown = new THREE.Vector3();
             
-            // Ставим муравья точно в точку пересечения
-            antRoot.position.copy(hit.point);
-            
-            // Используем нормаль полигона для идеального выравнивания
-            const surfaceNormal = hit.face.normal.clone();
-            // Трансформируем нормаль с учетом вращения меша (если бы он вращался, здесь он статичен, но полезно для общего случая)
-            surfaceNormal.transformDirection(mobiusMesh.matrixWorld).normalize();
+            // Body Parts references
+            this.legs = []; // { pivot1, pivot2, pivot3, side, offset }
+            this.antennae = [];
+            this.thorax = null;
+            this.head = null;
+            this.abdomen = null;
 
-            // Ориентация
-            const lookTarget = hit.point.clone().add(forward);
-            const up = surfaceNormal;
-            
-            const matrix = new THREE.Matrix4();
-            matrix.lookAt(lookTarget, hit.point, up);
-            antRoot.quaternion.setFromRotationMatrix(matrix);
-        } else {
-            // Фолбек на математику, если луч промахнулся (на краях)
-            antRoot.position.copy(targetPos);
-            antRoot.lookAt(targetNext);
+            this.createModel();
+            this.scene.add(this.group);
         }
 
-        // 3. ПРОЦЕДУРНАЯ АНИМАЦИЯ (Ноги и Тело)
-        const time = clock.elapsedTime * speed * 8; // Скорость шага
+        createModel() {
+            // Materials
+            const shellMat = new THREE.MeshStandardMaterial({
+                color: 0x8B4513, // Saddle Brown
+                roughness: 0.3,
+                metalness: 0.1,
+            });
+            const eyeMat = new THREE.MeshPhongMaterial({
+                color: 0x050505,
+                specular: 0xffffff,
+                shininess: 100
+            });
+            const legMat = new THREE.MeshStandardMaterial({
+                color: 0x5C3317, // Darker brown
+                roughness: 0.5
+            });
 
-        // А. Покачивание тела
-        const sway = Math.sin(time) * 0.02;
-        const bounce = Math.abs(Math.cos(time)) * 0.02;
-        antRoot.userData.body.position.y = 0.15 + bounce; // Центр тяжести над землей
-        antRoot.userData.body.rotation.z = sway; // Наклон влево-вправо
-        antRoot.userData.body.rotation.y = Math.cos(time * 0.5) * 0.05; // Легкий поворот корпуса
+            // 1. Thorax (Center)
+            const thoraxGeo = new THREE.SphereGeometry(0.25, 16, 16);
+            thoraxGeo.scale(1, 0.8, 1);
+            this.thorax = new THREE.Mesh(thoraxGeo, shellMat);
+            this.thorax.castShadow = true;
+            this.group.add(this.thorax);
 
-        // Б. Антенны (Высокочастотная дрожь)
-        antState.antennae.forEach((ant, i) => {
-            const noise = Math.sin(time * 3 + i) * 0.1;
-            ant.rotation.z = noise;
-            ant.rotation.y = noise * 0.5;
-        });
+            // 2. Head
+            const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            headGeo.scale(1, 0.8, 1.1);
+            this.head = new THREE.Mesh(headGeo, shellMat);
+            this.head.position.set(0, 0.1, 0.4); // Forward and up
+            this.head.castShadow = true;
+            this.thorax.add(this.head);
 
-        // В. Ноги (Tripod Gait)
-        antState.legs.forEach(leg => {
-            // Вычисляем фазу для этой ноги
-            // Tripod: ноги 0, 2, 5 (L1, L3, R2) в одной фазе, 1, 3, 4 (R1, L2, R3) в другой
-            // Индексы: 0(FL), 1(FR), 2(ML), 3(MR), 4(BL), 5(BR)
-            // Группа А: 0, 3, 4. Группа Б: 1, 2, 5
+            // Eyes
+            const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(0.12, 0.05, 0.1);
+            const rightEye = leftEye.clone();
+            rightEye.position.set(-0.12, 0.05, 0.1);
+            this.head.add(leftEye, rightEye);
+
+            // Antennae (Curve)
+            const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0.05, 0.2, 0.1),
+                new THREE.Vector3(0.15, 0.3, 0.2)
+            ]);
+            const antGeo = new THREE.TubeGeometry(curve, 8, 0.015, 4, false);
+            const antMat = new THREE.MeshStandardMaterial({ color: 0xA0522D }); // Lighter brown
             
-            const isGroupA = [0, 3, 4].includes(leg.index);
-            const legPhase = isGroupA ? 0 : Math.PI;
-            const cycle = time + legPhase;
+            const leftAnt = new THREE.Mesh(antGeo, antMat);
+            leftAnt.position.set(0.08, 0.1, 0.15);
+            this.head.add(leftAnt);
+            this.antennae.push({ mesh: leftAnt, baseRot: {x:0, y:0, z:0}, phase: 0 });
 
-            // Движение вперед-назад (Coxa)
-            const forwardSwing = Math.cos(cycle) * 0.25;
-            leg.parts.coxa.rotation.y = forwardSwing;
+            const rightAnt = leftAnt.clone();
+            rightAnt.scale.x = -1; // Mirror
+            rightAnt.position.set(-0.08, 0.1, 0.15);
+            this.head.add(rightAnt);
+            this.antennae.push({ mesh: rightAnt, baseRot: {x:0, y:0, z:0}, phase: Math.PI });
 
-            // Движение вверх-вниз (Femur lift)
-            // Поднимаем ногу только когда она идет вперед (возвратная фаза)
-            const lift = Math.max(0, Math.sin(cycle)) * 0.4;
+
+            // 3. Abdomen (Back)
+            const abGeo = new THREE.SphereGeometry(0.35, 16, 16);
+            abGeo.scale(1, 0.9, 1.4);
+            this.abdomen = new THREE.Mesh(abGeo, shellMat);
+            this.abdomen.position.set(0, 0.05, -0.55);
+            this.abdomen.castShadow = true;
+            this.thorax.add(this.abdomen);
+
+            // 4. Legs (3 pairs, 3 segments each)
+            const legPos = [0.15, 0, -0.2]; // Z positions on thorax
             
-            // Применяем вращения к суставам
-            leg.parts.femur.rotation.z = (leg.config.side * Math.PI / 3) + (leg.config.side * lift);
+            for(let i=0; i<3; i++) {
+                this.createLeg(legMat, 1, legPos[i], i); // Left
+                this.createLeg(legMat, -1, legPos[i], i); // Right
+            }
+        }
+
+        createLeg(material, side, zPos, index) {
+            // Hierarchy: Pivot -> Coxa -> Femur -> Tibia
             
-            // Компенсация Tibia (чтобы касалась земли)
-            // Когда бедро поднимается, голень немного распрямляется
-            leg.parts.tibia.rotation.z = (leg.config.side * -Math.PI / 1.5) - (leg.config.side * lift * 0.5);
-        });
+            // Pivot on Thorax
+            const pivot = new THREE.Group();
+            pivot.position.set(side * 0.15, -0.05, zPos);
+            // Rotate base slightly to fan out legs
+            const fanAngle = (index - 1) * 0.4; 
+            pivot.rotation.y = fanAngle * side; 
+            this.thorax.add(pivot);
+
+            // Coxa (Hip) - Short
+            const coxaGeo = new THREE.CapsuleGeometry(0.04, 0.1, 4, 8);
+            const coxa = new THREE.Mesh(coxaGeo, material);
+            coxa.rotation.z = side * Math.PI / 3;
+            coxa.position.x = side * 0.05;
+            pivot.add(coxa);
+
+            // Femur (Thigh) - Long, goes up
+            const femurGroup = new THREE.Group();
+            femurGroup.position.set(0, 0.05, 0); // End of Coxa
+            coxa.add(femurGroup);
+
+            const femurGeo = new THREE.CapsuleGeometry(0.035, 0.35, 4, 8);
+            const femur = new THREE.Mesh(femurGeo, material);
+            femur.position.y = 0.175; // Center of geometry
+            femurGroup.rotation.z = side * 1.0; // Angle up
+            femurGroup.add(femur);
+
+            // Tibia (Shin) - Long, goes down
+            const tibiaGroup = new THREE.Group();
+            tibiaGroup.position.set(0, 0.35, 0); // End of Femur
+            femur.add(tibiaGroup);
+
+            const tibiaGeo = new THREE.CapsuleGeometry(0.025, 0.4, 4, 8);
+            const tibia = new THREE.Mesh(tibiaGeo, material);
+            tibia.position.y = -0.2; // Hang down
+            tibiaGroup.rotation.z = side * -2.2; // Angle down sharply
+            tibiaGroup.add(tibia);
+
+            this.legs.push({
+                root: pivot,
+                coxa: coxa,
+                femur: femurGroup,
+                tibia: tibiaGroup,
+                side: side,
+                index: index,
+                baseRotY: pivot.rotation.y,
+                baseFemurZ: femurGroup.rotation.z,
+                baseTibiaZ: tibiaGroup.rotation.z
+            });
+        }
+
+        update(time, delta) {
+            this.speed = PARAMS.antSpeed;
+            this.u += this.speed * delta * 0.5;
+
+            // --- 1. PHYSICS & RAYCASTING ---
+            
+            // Step A: Get ideal Mathematical position & normal
+            const idealPos = new THREE.Vector3();
+            const idealNorm = new THREE.Vector3();
+            getMobiusData(this.u, this.v, idealPos, idealNorm);
+
+            // Step B: Prepare Raycaster
+            // We start "above" the surface (along normal) and shoot down
+            const rayOrigin = idealPos.clone().add(idealNorm.clone().multiplyScalar(1.5));
+            const rayDir = idealNorm.clone().negate(); // Down
+
+            this.raycaster.set(rayOrigin, rayDir);
+            
+            // Intersect with Mobius Mesh
+            // Note: raycaster can be CPU heavy. We optimized geometry segments.
+            const intersects = this.raycaster.intersectObject(mobiusMesh);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                
+                // Set position exactly on the face
+                this.group.position.copy(hit.point);
+
+                // For orientation, we blend the mathematical normal (smooth) 
+                // with the face normal (accurate but faceted)
+                // Using mathematical normal for Up vector usually looks smoother for walking
+                const up = idealNorm;
+                
+                // Calculate Forward vector (Tangent)
+                const nextPos = new THREE.Vector3();
+                getMobiusData(this.u + 0.05, this.v, nextPos, null);
+                
+                // Project nextPos onto the plane defined by 'up' to ensure orthogonality
+                const forward = new THREE.Vector3().subVectors(nextPos, hit.point).normalize();
+                
+                // Matrix construction
+                const m = new THREE.Matrix4();
+                const right = new THREE.Vector3().crossVectors(up, forward).normalize();
+                const correctedForward = new THREE.Vector3().crossVectors(right, up).normalize();
+                
+                m.makeBasis(right, up, correctedForward.negate()); // Negate forward because model faces +Z or -Z depending
+                this.group.quaternion.setFromRotationMatrix(m);
+                
+                // Correct model orientation (if ant was built facing Z, align it)
+                this.group.rotateY(Math.PI); 
+
+            } else {
+                // Fallback if raycast fails (e.g. edge cases)
+                this.group.position.copy(idealPos);
+                // Simple orientation
+                const lookAtPos = new THREE.Vector3();
+                getMobiusData(this.u + 0.1, this.v, lookAtPos, null);
+                this.group.lookAt(lookAtPos);
+            }
+
+            // --- 2. ORGANIC ANIMATION ---
+
+            if (this.speed > 0) {
+                const walkCycle = time * this.speed * 15;
+                
+                // A. Body Sway
+                this.thorax.rotation.z = Math.sin(walkCycle) * 0.05; // Roll
+                this.thorax.rotation.y = Math.cos(walkCycle * 0.5) * 0.05; // Yaw
+                this.head.rotation.x = Math.sin(walkCycle * 2) * 0.05 - 0.2; // Bobbing
+                this.abdomen.rotation.x = Math.sin(walkCycle * 2 + Math.PI) * 0.05;
+
+                // B. Leg Movement (Inverse Kinematics approximation via FK)
+                this.legs.forEach(leg => {
+                    // Tripod Gait: Legs 0,2 on left move with 1 on right
+                    const isTripodA = (leg.index % 2 === 0 && leg.side === 1) || (leg.index % 2 !== 0 && leg.side === -1);
+                    const phase = isTripodA ? 0 : Math.PI;
+                    
+                    const cycle = walkCycle + phase;
+                    
+                    // 1. Swing (Forward/Back) - Coxa
+                    const swingAmp = 0.5; 
+                    leg.root.rotation.y = leg.baseRotY + Math.sin(cycle) * swingAmp * leg.side;
+
+                    // 2. Lift (Up/Down) - Femur
+                    // Lift happens when leg moves forward (sin > 0)
+                    const liftVal = Math.max(0, Math.sin(cycle));
+                    const liftAmp = 0.6;
+                    leg.femur.rotation.z = leg.baseFemurZ + (liftVal * liftAmp * leg.side);
+
+                    // 3. Reach/Contract - Tibia
+                    // Leg extends when on ground, flexes when lifted
+                    leg.tibia.rotation.z = leg.baseTibiaZ + (liftVal * 1.5 * leg.side);
+                });
+
+                // C. Antennae Wiggle
+                this.antennae.forEach(ant => {
+                    const noise = Math.sin(time * 10 + ant.phase);
+                    ant.mesh.rotation.z = noise * 0.1;
+                    ant.mesh.rotation.x = Math.cos(time * 8) * 0.05;
+                });
+            }
+        }
     }
 
-    // --- GUI И СОБЫТИЯ ---
+    // --- ENVIRONMENT ---
+    function createEnvironment() {
+        const geo = new THREE.PlaneGeometry(100, 100);
+        const mat = new THREE.ShadowMaterial({ opacity: 0.5 });
+        const plane = new THREE.Mesh(geo, mat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -8;
+        plane.receiveShadow = true;
+        scene.add(plane);
 
+        // Stars
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 1000;
+        const starPos = [];
+        for(let i=0; i<starCount; i++) {
+            starPos.push((Math.random()-0.5)*100, (Math.random()-0.5)*100, (Math.random()-0.5)*100);
+        }
+        starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({color: 0xffffff, size: 0.1});
+        scene.add(new THREE.Points(starGeo, starMat));
+    }
+
+    // --- UI ---
     function setupGUI() {
-        const gui = new GUI({ title: 'Параметры' });
+        const gui = new GUI();
+        const folder = gui.addFolder('Parameters');
         
-        const fGeo = gui.addFolder('Геометрия');
-        fGeo.add(PARAMS, 'twists', 0, 4, 0.1).name('Скручивания').onChange(createMobiusStrip);
-        fGeo.add(PARAMS, 'width', 1, 5).name('Ширина').onChange(createMobiusStrip);
-        fGeo.add(PARAMS, 'radius', 4, 10).name('Радиус').onChange(createMobiusStrip);
-        fGeo.add(PARAMS, 'showWireframe').name('Сетка').onChange(createMobiusStrip);
-
-        const fAnt = gui.addFolder('Муравей');
-        fAnt.add(PARAMS, 'antSpeed', 0, 3).name('Скорость');
-        
-        gui.open();
+        folder.add(PARAMS, 'twists', 0, 4, 0.1).name('Twists').onChange(createMobiusStrip);
+        folder.add(PARAMS, 'width', 1, 5).name('Width').onChange(createMobiusStrip);
+        folder.add(PARAMS, 'radius', 4, 10).name('Radius').onChange(createMobiusStrip);
+        folder.add(PARAMS, 'antSpeed', 0, 3).name('Ant Speed');
+        folder.add(PARAMS, 'bloomStrength', 0, 2).name('Glow').onChange(v => composer.passes[1].strength = v);
+        folder.add(PARAMS, 'showWireframe').name('Wireframe').onChange(createMobiusStrip);
     }
 
     function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
     }
 
     function animate() {
         requestAnimationFrame(animate);
-        
         const delta = clock.getDelta();
-        
-        // Поворот всей сцены для обзора (если пользователь не крутит камерой)
-        // Но OrbitControls это перебивает, оставим статику для научного вида
-        
-        updateAnt(delta);
-        controls.update();
-        renderer.render(scene, camera);
-    }
+        const time = clock.getElapsedTime();
 
+        if (ant) ant.update(time, delta);
+        controls.update();
+
+        composer.render();
+    }
 </script>
 </body>
 </html>
