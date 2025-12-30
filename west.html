@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathVerse | Scientific Catalog</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js (Optimized via CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#050505',
+                        glass: 'rgba(255, 255, 255, 0.02)',
+                        'glass-border': 'rgba(255, 255, 255, 0.08)',
+                        neon: '#00F0FF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #050505; color: #e5e7eb; }
+
+        /* Container for 3D Canvas inside cards */
+        .canvas-wrapper {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            border-radius: 1.5rem;
+            opacity: 0.8;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Content sits on top of canvas */
+        .card-content {
+            position: relative;
+            z-index: 10;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            pointer-events: none; /* Let clicks pass through to potential interactives */
+        }
+
+        .card-hover-effect {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover-effect:hover {
+            transform: scale(1.02);
+            border-color: rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.1);
+        }
+
+        .card-hover-effect:hover .canvas-wrapper {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col items-center justify-center p-6 md:p-12">
+
+    <header class="w-full max-w-7xl mb-10 flex justify-between items-end border-b border-white/10 pb-6">
+        <div>
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 bg-neon rounded-full animate-pulse"></span>
+                <p class="font-mono text-neon text-xs tracking-[0.2em]">ACADEMIC_PORTAL_V3</p>
+            </div>
+            <h1 class="font-display text-5xl md:text-6xl font-bold tracking-tighter text-white">MathVerse</h1>
+        </div>
+        <div class="hidden md:block text-right font-mono text-xs text-gray-500">
+            <p>RENDERER: THREE.JS r128</p>
+            <p>OPTIMIZATION: ACTIVE</p>
+        </div>
+    </header>
+
+    <!-- BENTO GRID -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-w-7xl auto-rows-[300px]">
+
+        <!-- 1. CALCULUS (Wide & Tall) -->
+        <div class="relative group col-span-1 md:col-span-2 row-span-2 bg-glass border border-glass-border rounded-3xl p-8 card-hover-effect overflow-hidden">
+            <div id="canvas-calculus" class="canvas-wrapper"></div> <!-- 3D Target -->
+            <div class="card-content">
+                <div class="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+                    <span class="font-display text-xl text-white">∫</span>
+                </div>
+                <div>
+                    <h2 class="font-display text-4xl text-white mb-2">Calculus</h2>
+                    <p class="font-sans text-gray-400 max-w-md">Topology of surfaces. Real-time vertex displacement analysis using wave functions.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. LINEAR ALGEBRA (Wide) -->
+        <div class="relative group col-span-1 md:col-span-2 bg-glass border border-glass-border rounded-3xl p-8 card-hover-effect overflow-hidden">
+            <div id="canvas-linalg" class="canvas-wrapper"></div>
+            <div class="card-content">
+                <div class="flex justify-between items-start w-full">
+                    <div>
+                        <h3 class="font-display text-2xl text-white">Linear Algebra</h3>
+                        <p class="font-mono text-xs text-neon mt-1">BASIS_TRANSFORMATION</p>
+                    </div>
+                </div>
+                <p class="font-sans text-sm text-gray-400 mt-4">Cube to Sphere matrix interpolation.</p>
+            </div>
+        </div>
+
+        <!-- 3. SOCIAL CHOICE (Standard) -->
+        <div class="relative group col-span-1 bg-glass border border-glass-border rounded-3xl p-6 card-hover-effect overflow-hidden">
+            <div id="canvas-social" class="canvas-wrapper"></div>
+            <div class="card-content">
+                <h3 class="font-display text-xl text-white">Social Choice</h3>
+                <div class="mt-auto">
+                    <p class="font-mono text-[10px] text-gray-500">NODE_CLUSTERING</p>
+                    <p class="font-sans text-xs text-gray-300">Dynamic graph theory agents.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. STATISTICS (Standard) -->
+        <div class="relative group col-span-1 bg-glass border border-glass-border rounded-3xl p-6 card-hover-effect overflow-hidden">
+            <div id="canvas-stats" class="canvas-wrapper"></div>
+            <div class="card-content">
+                <h3 class="font-display text-xl text-white">Statistics</h3>
+                <div class="mt-auto">
+                    <p class="font-mono text-[10px] text-gray-500">GAUSSIAN_DIST</p>
+                    <p class="font-sans text-xs text-gray-300">Normal distribution particle cloud.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. TOPOLOGY (Wide) -->
+        <div class="relative group col-span-1 md:col-span-2 bg-glass border border-glass-border rounded-3xl p-8 card-hover-effect overflow-hidden">
+            <div id="canvas-topology" class="canvas-wrapper"></div>
+            <div class="card-content flex flex-row items-center justify-between">
+                <div>
+                    <h3 class="font-display text-3xl text-white">Topology</h3>
+                    <p class="font-sans text-sm text-gray-400 mt-2">Continuous deformations.</p>
+                </div>
+                <div class="text-right">
+                    <span class="px-2 py-1 border border-white/10 rounded text-[10px] font-mono text-neon bg-black/40">GENUS_1</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer class="mt-12 text-gray-600 font-mono text-xs">
+        System Generated // 2025
+    </footer>
+
+    <!-- THREE.JS LOGIC -->
+    <script>
+        // --- UTILITIES ---
+        // Helper to setup a scene, camera, and renderer for a specific DOM element
+        function createSketch(containerId, initFn, animateFn) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const scene = new THREE.Scene();
+            // Add a little fog to blend edges
+            scene.fog = new THREE.FogExp2(0x000000, 0.05);
+
+            const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // Alpha true for glassmorphism
+
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimize pixel ratio
+            container.appendChild(renderer.domElement);
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+
+            // Initialize specific scene content
+            const data = initFn(scene, camera, renderer);
+
+            // Animation Loop
+            const clock = new THREE.Clock();
+            function tick() {
+                requestAnimationFrame(tick);
+                const time = clock.getElapsedTime();
+                if (animateFn) animateFn(data, time, scene, camera);
+                renderer.render(scene, camera);
+            }
+            tick();
+        }
+
+        // --- 1. CALCULUS: Wavy Wireframe Surface ---
+        createSketch('canvas-calculus', (scene, camera) => {
+            camera.position.set(0, 3, 4);
+            camera.lookAt(0, 0, 0);
+
+            // Lights
+            const pLight = new THREE.PointLight(0x00F0FF, 1, 10);
+            pLight.position.set(2, 4, 2);
+            scene.add(pLight);
+
+            // Plane Geometry (High segment count for smooth waves)
+            const geometry = new THREE.PlaneGeometry(8, 8, 50, 50); // Optimized from 100x100
+            const material = new THREE.MeshPhysicalMaterial({
+                color: 0x0a1020,
+                emissive: 0x004060,
+                emissiveIntensity: 0.2,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.5,
+                side: THREE.DoubleSide
+            });
+            const plane = new THREE.Mesh(geometry, material);
+            plane.rotation.x = -Math.PI / 2;
+            scene.add(plane);
+
+            return { plane, geometry };
+        }, (data, time) => {
+            const { geometry, plane } = data;
+            const positions = geometry.attributes.position;
+
+            // Vertex displacement loop
+            for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i); // This is local Y (which is flat on plane)
+                // We modify Z because plane is rotated, but locally it's Z
+                const z = Math.sin(x * 0.8 + time) * 0.6 + Math.cos(y * 0.5 + time * 1.5) * 0.4;
+                positions.setZ(i, z);
+            }
+            positions.needsUpdate = true;
+
+            // Slow flyover camera
+            plane.rotation.z = time * 0.05;
+        });
+
+        // --- 2. LINEAR ALGEBRA: The Hypercube (Tesseract) ---
+        createSketch('canvas-linalg', (scene, camera) => {
+            camera.position.z = 4.5;
+
+            // 16 вершин Тессеракта (x, y, z, w)
+            // Генерируем их программно: +1/-1 для всех 4 измерений
+            const points4D = [];
+            for(let i=0; i<16; i++) {
+                points4D.push({
+                    x: (i & 1) ? 1 : -1,
+                    y: (i & 2) ? 1 : -1,
+                    z: (i & 4) ? 1 : -1,
+                    w: (i & 8) ? 1 : -1
+                });
+            }
+
+            // Линии (Ребра): Соединяем вершины, отличающиеся только одной координатой
+            const edges = [];
+            for(let i=0; i<16; i++) {
+                for(let j=i+1; j<16; j++) {
+                    // XOR вершин дает битмаску различий. Если степень двойки - значит отличие в 1 координате
+                    let diff = i ^ j;
+                    if ((diff & (diff - 1)) === 0) {
+                        edges.push([i, j]);
+                    }
+                }
+            }
+
+            // Создаем геометрию линий
+            const lineGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(edges.length * 2 * 3); // 2 points per edge, 3 coords
+            lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.LineBasicMaterial({
+                color: 0x00F0FF, // Neon Cyan
+                transparent: true,
+                opacity: 0.6
+            });
+            const lineSegments = new THREE.LineSegments(lineGeo, material);
+            scene.add(lineSegments);
+
+            // Добавляем узлы (сферы на вершинах) для красоты
+            const spheres = new THREE.InstancedMesh(
+                new THREE.SphereGeometry(0.04, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xFFFFFF }),
+                16
+            );
+            scene.add(spheres);
+
+            return { points4D, edges, lineSegments, spheres };
+
+        }, (data, time) => {
+            const { points4D, edges, lineSegments, spheres } = data;
+            const positions = lineSegments.geometry.attributes.position.array;
+            const dummy = new THREE.Object3D();
+
+            // 3D проекции вершин
+            const projected3D = [];
+
+            // Вращение в 4D (плоскости XW и ZW)
+            const angle = time * 0.8;
+
+            for(let i=0; i<16; i++) {
+                let p = { ...points4D[i] };
+
+                // Ротация XW
+                let x = p.x * Math.cos(angle) - p.w * Math.sin(angle);
+                let w = p.x * Math.sin(angle) + p.w * Math.cos(angle);
+                p.x = x; p.w = w;
+
+                // Проекция 4D -> 3D (Перспектива)
+                // Чем дальше 'w', тем меньше объект (расстояние камеры 4D = 2)
+                const distance = 2.5;
+                const wFactor = 1 / (distance - p.w);
+
+                const projX = p.x * wFactor;
+                const projY = p.y * wFactor;
+                const projZ = p.z * wFactor;
+
+                projected3D.push(new THREE.Vector3(projX, projY, projZ));
+
+                // Обновляем узлы
+                dummy.position.set(projX, projY, projZ);
+                dummy.scale.setScalar(wFactor); // Уменьшаем дальние узлы
+                dummy.updateMatrix();
+                spheres.setMatrixAt(i, dummy.matrix);
+            }
+
+            spheres.instanceMatrix.needsUpdate = true;
+
+            // Обновляем линии
+            let idx = 0;
+            for(let edge of edges) {
+                const v1 = projected3D[edge[0]];
+                const v2 = projected3D[edge[1]];
+
+                positions[idx++] = v1.x; positions[idx++] = v1.y; positions[idx++] = v1.z;
+                positions[idx++] = v2.x; positions[idx++] = v2.y; positions[idx++] = v2.z;
+            }
+            lineSegments.geometry.attributes.position.needsUpdate = true;
+
+            // Легкое вращение всего объекта в 3D
+            lineSegments.rotation.y = time * 0.1;
+            spheres.rotation.y = time * 0.1;
+        });
+
+        // --- 3. SOCIAL CHOICE: Connected Nodes ---
+        createSketch('canvas-social', (scene, camera) => {
+            camera.position.z = 12;
+
+            const nodeCount = 40;
+            const geometry = new THREE.IcosahedronGeometry(0.2, 1);
+            const material = new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.1, metalness: 0.8 });
+
+            // Instanced Mesh for Nodes
+            const nodes = new THREE.InstancedMesh(geometry, material, nodeCount);
+
+            // Store physics data
+            const velocities = [];
+            const positions = [];
+            const dummy = new THREE.Object3D();
+
+            for (let i = 0; i < nodeCount; i++) {
+                const x = (Math.random() - 0.5) * 10;
+                const y = (Math.random() - 0.5) * 10;
+                const z = (Math.random() - 0.5) * 5;
+                positions.push(new THREE.Vector3(x, y, z));
+                velocities.push(new THREE.Vector3((Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05, (Math.random()-0.5)*0.05));
+
+                dummy.position.set(x, y, z);
+                dummy.updateMatrix();
+                nodes.setMatrixAt(i, dummy.matrix);
+            }
+            scene.add(nodes);
+
+            // Lights
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(0, 0, 5);
+            scene.add(light);
+
+            // Lines Pool
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
+            const lineGeo = new THREE.BufferGeometry();
+            // Max possible connections approx estimation
+            const maxLines = nodeCount * nodeCount;
+            const linePos = new Float32Array(maxLines * 6); // 2 points * 3 coords
+            lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+            const lines = new THREE.LineSegments(lineGeo, lineMat);
+            lines.frustumCulled = false; // Optim: Always render
+            scene.add(lines);
+
+            return { nodes, positions, velocities, dummy, lines, linePos };
+        }, (data, time) => {
+            const { nodes, positions, velocities, dummy, lines, linePos } = data;
+
+            let lineIndex = 0;
+            const connectDist = 3.5;
+
+            // Update Nodes
+            for (let i = 0; i < positions.length; i++) {
+                // Move
+                positions[i].add(velocities[i]);
+
+                // Bounce
+                if(Math.abs(positions[i].x) > 6) velocities[i].x *= -1;
+                if(Math.abs(positions[i].y) > 6) velocities[i].y *= -1;
+                if(Math.abs(positions[i].z) > 3) velocities[i].z *= -1;
+
+                dummy.position.copy(positions[i]);
+                dummy.updateMatrix();
+                nodes.setMatrixAt(i, dummy.matrix);
+
+                // Check connections (Simple O(N^2) but N=40 is fast)
+                for (let j = i + 1; j < positions.length; j++) {
+                    const d = positions[i].distanceTo(positions[j]);
+                    if (d < connectDist) {
+                        linePos[lineIndex++] = positions[i].x;
+                        linePos[lineIndex++] = positions[i].y;
+                        linePos[lineIndex++] = positions[i].z;
+                        linePos[lineIndex++] = positions[j].x;
+                        linePos[lineIndex++] = positions[j].y;
+                        linePos[lineIndex++] = positions[j].z;
+                    }
+                }
+            }
+            nodes.instanceMatrix.needsUpdate = true;
+
+            lines.geometry.setDrawRange(0, lineIndex / 3);
+            lines.geometry.attributes.position.needsUpdate = true;
+
+            nodes.rotation.y = time * 0.05;
+            lines.rotation.y = time * 0.05;
+        });
+
+        // --- 4. STATISTICS: The Lorenz Attractor (Chaos) ---
+        createSketch('canvas-stats', (scene, camera) => {
+            camera.position.set(0, 0, 50); // Отдаляемся, так как значения Лоренца большие
+
+            // Параметры аттрактора
+            const maxPoints = 3000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(maxPoints * 3);
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            // Градиентный цвет для линии (от темного к светлому)
+            const colors = new Float32Array(maxPoints * 3);
+            const colorStart = new THREE.Color(0xcc9900); // Gold
+            const colorEnd = new THREE.Color(0xffffff);   // White
+
+            for (let i = 0; i < maxPoints; i++) {
+                const t = i / maxPoints;
+                const c = colorStart.clone().lerp(colorEnd, t);
+                colors[i * 3] = c.r;
+                colors[i * 3 + 1] = c.g;
+                colors[i * 3 + 2] = c.b;
+            }
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2 });
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+
+            // Начальное состояние
+            let x = 0.1, y = 0, z = 0;
+
+            return { line, positions, x, y, z, count: 0 };
+
+        }, (data, time) => {
+            let { line, positions, x, y, z, count } = data;
+
+            // Константы Лоренца
+            const sigma = 10;
+            const rho = 28;
+            const beta = 8/3;
+            const dt = 0.008; // Скорость симуляции
+
+            // Рисуем несколько шагов за кадр для плавности линии
+            const stepsPerFrame = 5;
+
+            for(let s=0; s<stepsPerFrame; s++) {
+                // Уравнения Лоренца
+                const dx = sigma * (y - x) * dt;
+                const dy = (x * (rho - z) - y) * dt;
+                const dz = (x * y - beta * z) * dt;
+
+                x += dx;
+                y += dy;
+                z += dz;
+
+                // Сдвигаем массив точек (эффект хвоста)
+                // Копируем все точки на одну назад
+                for (let i = 0; i < positions.length - 3; i++) {
+                    positions[i] = positions[i + 3];
+                }
+
+                // Добавляем новую точку в конец
+                const lastIdx = positions.length - 3;
+                positions[lastIdx] = x;
+                positions[lastIdx+1] = y;
+                positions[lastIdx+2] = z;
+            }
+
+            // Обновляем стейт
+            data.x = x; data.y = y; data.z = z;
+
+            // Центрируем камеру и вращаем
+            line.geometry.attributes.position.needsUpdate = true;
+            line.rotation.z = time * 0.2;
+            line.rotation.x = -Math.PI / 2; // Поворот, чтобы ось Z смотрела вверх
+        });
+
+        // --- 5. TOPOLOGY: Glass Torus Knot ---
+        createSketch('canvas-topology', (scene, camera) => {
+            camera.position.z = 6;
+
+            const geometry = new THREE.TorusKnotGeometry(1.5, 0.4, 100, 16);
+
+            // Glass Material
+            const material = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff,
+                metalness: 0.1,
+                roughness: 0.2,
+                transmission: 0.9, // Glass
+                transparent: true,
+                thickness: 1.5,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1
+            });
+
+            const knot = new THREE.Mesh(geometry, material);
+            scene.add(knot);
+
+            // Internal Light (The Soul)
+            const innerLight = new THREE.PointLight(0xffaa00, 2, 5);
+            knot.add(innerLight); // Add light TO the mesh so it rotates with it
+
+            // External Lights for reflection
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(5, 5, 5);
+            scene.add(dirLight);
+
+            const ambient = new THREE.AmbientLight(0x404040);
+            scene.add(ambient);
+
+            // Background floating particles for depth
+            const partGeo = new THREE.BufferGeometry();
+            const partPos = [];
+            for(let i=0; i<50; i++) {
+                partPos.push((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*5 - 2);
+            }
+            partGeo.setAttribute('position', new THREE.Float32BufferAttribute(partPos, 3));
+            const particles = new THREE.Points(partGeo, new THREE.PointsMaterial({color: 0x333333, size: 0.05}));
+            scene.add(particles);
+
+            return { knot };
+        }, (data, time) => {
+            const { knot } = data;
+            // Hypnotic rotation
+            knot.rotation.x = time * 0.3;
+            knot.rotation.y = time * 0.2;
+        });
+
+    </script>
+</body>
+</html>
