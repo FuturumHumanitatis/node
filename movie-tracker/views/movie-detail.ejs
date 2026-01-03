@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title><%= movie.title %> — Смотрилка</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #071028;
+      color: #ffffff;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      padding: 1rem;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .movie-poster {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    .movie-info {
+      margin-bottom: 1rem;
+    }
+    .movie-info h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .movie-meta {
+      color: #9fb0d4;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .review-form textarea {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img
+      src="<%= movie.poster_url || 'https://via.placeholder.com/400x600.png?text=No+Poster' %>"
+      alt="<%= movie.title %>"
+      class="movie-poster"
+    />
+    <div class="movie-info">
+      <h1><%= movie.title %></h1>
+      <div class="movie-meta">
+        <span>Режиссер: <%= movie.director || 'Неизвестен' %></span>
+        <br />
+        <span>Рейтинг: <%= movie.rating %>/10</span>
+        <br />
+        <span>Добавил: <%= movie.added_by %></span>
+      </div>
+    </div>
+
+    <% if (currentUser) { %>
+      <form action="/review/<%= movie.id %>" method="POST" class="review-form">
+        <textarea name="review" rows="4" placeholder="Оставьте свой отзыв..." required></textarea>
+        <button type="submit" class="btn btn-primary">Добавить отзыв</button>
+      </form>
+    <% } %>
+
+    <h2>Рецензии</h2>
+    <% if (reviews.length === 0) { %>
+      <p>Рецензий пока нет. Будьте первым!</p>
+    <% } else { %>
+      <% reviews.forEach(review => { %>
+        <div class="mb-3">
+          <p><%= review.review %></p>
+          <small>Автор: <%= review.author %></small>
+          <hr />
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</body>
+</html>

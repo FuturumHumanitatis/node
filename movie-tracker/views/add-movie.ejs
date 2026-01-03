@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Добавить фильм</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #071028;
+      color: #ffffff;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 2rem;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="mb-4">Добавить фильм</h2>
+    <form action="/add-movie" method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="title" class="form-label">Название</label>
+        <input type="text" class="form-control" id="title" name="title" required />
+      </div>
+      <div class="mb-3">
+        <label for="year" class="form-label">Год выпуска</label>
+        <input type="number" class="form-control" id="year" name="year" />
+      </div>
+      <div class="mb-3">
+        <label for="director" class="form-label">Режиссер</label>
+        <input type="text" class="form-control" id="director" name="director" />
+      </div>
+      <div class="mb-3">
+        <label for="rating" class="form-label">Оценка (0-10)</label>
+        <input type="number" class="form-control" id="rating" name="rating" min="0" max="10" step="0.5" required />
+      </div>
+      <div class="mb-3">
+        <label for="poster" class="form-label">Постер</label>
+        <input type="file" class="form-control" id="poster" name="poster" accept="image/*" />
+      </div>
+      <div class="mb-3">
+        <label for="watched_date" class="form-label">Дата просмотра</label>
+        <input type="date" class="form-control" id="watched_date" name="watched_date" />
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Добавить</button>
+      <a href="/" class="btn btn-link w-100 mt-2 text-center">← Вернуться</a>
+    </form>
+  </div>
+</body>
+</html>
