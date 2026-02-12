@@ -4,6 +4,13 @@ const bcrypt = require('bcrypt'); // Для хэширования пароле�
 const multer = require('multer');
 const path = require('path');
 const Database = require('better-sqlite3'); // Подключаем better-sqlite3
+const {
+  checkAndAddColumn,
+  getMovieWithUser,
+  getAllMoviesWithUsers,
+  handleDatabaseError,
+  requireAuth,
+} = require('./utils');
 const app = express();
 
 // Настройка базы данных
@@ -42,16 +49,7 @@ db.exec(`
 `);
 
 // Проверяем, есть ли колонка `user_id` в таблице `movies`
-const movieTableInfo = db.prepare(`PRAGMA table_info(movies)`).all();
-const hasUserIdColumn = movieTableInfo.some(column => column.name === 'user_id');
-
-if (!hasUserIdColumn) {
-  console.log('Колонка `user_id` отсутствует в таблице `movies`. Добавляю...');
-
-  db.exec(`ALTER TABLE movies ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1;`);
-
-  console.log('Колонка `user_id` успешно добавлена!');
-}
+checkAndAddColumn(db, 'movies', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 
 // Настройка для загрузки постеров
 const uploadDir = path.join(__dirname, 'public/uploads');
@@ -85,16 +83,7 @@ app.use((req, res, next) => {
 
 // Главная страница — фильмы и статистика
 app.get('/', (req, res) => {
-  const movies = db
-    .prepare(
-      `
-      SELECT m.*, u.username AS added_by
-      FROM movies m
-      JOIN users u ON m.user_id = u.id
-      ORDER BY m.created_at DESC
-    `
-    )
-    .all();
+  const movies = getAllMoviesWithUsers(db);
   const stats = db
     .prepare(
       `
@@ -114,12 +103,7 @@ app.get('/register', (req, res) => {
 });
 
 // Форма добавления фильма
-app.get('/add', (req, res) => {
-  // Проверяем, авторизован ли пользователь
-  if (!req.session.user) {
-    return res.status(403).send('Необходимо войти, чтобы добавить фильм.');
-  }
-
+app.get('/add', requireAuth, (req, res) => {
   // Рендерим страницу с формой добавления фильма
   res.render('add-movie');
 });
@@ -133,12 +117,12 @@ app.post('/register', async (req, res) => {
     db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashedPassword);
     res.redirect('/login');
   } catch (err) {
-    console.error(err);
-    if (err.message.includes('UNIQUE')) {
-      res.status(400).send('Пользователь с таким никнеймом уже существует.');
-    } else {
-      res.status(500).send('Ошибка регистрации.');
-    }
+    handleDatabaseError(
+      err,
+      res,
+      'Пользователь с таким никнеймом уже существует.',
+      'Ошибка регистрации.'
+    );
   }
 });
 
@@ -173,7 +157,7 @@ app.get('/logout', (req, res) => {
 });
 
 // Добавление фильма
-app.post('/add-movie', upload.single('poster'), (req, res) => {
+app.post('/add-movie', requireAuth, upload.single('poster'), (req, res) => {
   const { title, year, director, rating, watched_date } = req.body;
   const poster_url = req.file ? `/uploads/${req.file.filename}` : null;
   const user_id = req.session.user.id;
@@ -187,12 +171,12 @@ app.post('/add-movie', upload.single('poster'), (req, res) => {
     ).run(title, year || null, director || null, rating || 0, watched_date || null, poster_url, user_id);
     res.redirect('/');
   } catch (err) {
-    console.error(err);
-    if (err.message.includes('UNIQUE')) {
-      res.status(400).send('Фильм с таким названием уже существует.');
-    } else {
-      res.status(500).send('Ошибка добавления фильма.');
-    }
+    handleDatabaseError(
+      err,
+      res,
+      'Фильм с таким названием уже существует.',
+      'Ошибка добавления фильма.'
+    );
   }
 });
 
@@ -200,16 +184,7 @@ app.post('/add-movie', upload.single('poster'), (req, res) => {
 app.get('/movie/:id', (req, res) => {
   const { id } = req.params;
 
-  const movie = db
-    .prepare(
-      `
-      SELECT m.*, u.username AS added_by
-      FROM movies m
-      JOIN users u ON m.user_id = u.id
-      WHERE m.id = ?
-    `
-    )
-    .get(id);
+  const movie = getMovieWithUser(db, id);
 
   if (!movie) {
     return res.status(404).send('Фильм не найден.');
@@ -231,7 +206,7 @@ app.get('/movie/:id', (req, res) => {
 });
 
 // Добавление рецензии
-app.post('/review/:id', (req, res) => {
+app.post('/review/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { review } = req.body;
   const user_id = req.session.user.id;
