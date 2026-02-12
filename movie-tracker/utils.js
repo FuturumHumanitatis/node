@@ -5,11 +5,20 @@
 /**
  * Checks if a column exists in a table and adds it if missing
  * @param {Object} db - better-sqlite3 database instance
- * @param {string} tableName - Name of the table
+ * @param {string} tableName - Name of the table (must be a valid table name)
  * @param {string} columnName - Name of the column to check/add
  * @param {string} columnDefinition - SQL definition for the column (e.g., 'TEXT', 'INTEGER NOT NULL DEFAULT 1')
  */
 function checkAndAddColumn(db, tableName, columnName, columnDefinition) {
+  // Validate table name to prevent SQL injection
+  const validTablePattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+  if (!validTablePattern.test(tableName)) {
+    throw new Error(`Invalid table name: ${tableName}`);
+  }
+  if (!validTablePattern.test(columnName)) {
+    throw new Error(`Invalid column name: ${columnName}`);
+  }
+
   const tableInfo = db.prepare(`PRAGMA table_info(${tableName})`).all();
   const hasColumn = tableInfo.some(column => column.name === columnName);
 
